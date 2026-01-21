@@ -448,8 +448,40 @@ function renderTransactions() {
 // Initialization
 // ========================================
 
+// ========================================
+// Authentication Logic
+// ========================================
+
+function checkAuth() {
+    const token = localStorage.getItem('token');
+    return !!token;
+}
+
+function updateNavAuth() {
+    const navActions = document.querySelector('.nav-actions');
+    const isLoggedIn = checkAuth();
+
+    if (isLoggedIn) {
+        navActions.innerHTML = `
+            <a href="/profile.html" class="btn-secondary" style="text-decoration: none;">Mon Profil</a>
+            <button class="btn-primary" id="createWalletBtn">Démarrer</button>
+        `;
+    } else {
+        navActions.innerHTML = `
+            <a href="/login.html" class="btn-secondary" style="text-decoration: none;">Se Connecter</a>
+            <button class="btn-primary" onclick="window.location.href='/login.html'">Rejoindre</button>
+        `;
+    }
+}
+
+// ========================================
+// Initialization
+// ========================================
+
 async function init() {
     console.log('🚀 Initializing Student Wallet...');
+
+    updateNavAuth();
 
     const themeToggle = document.getElementById('themeToggle');
     if (themeToggle) {

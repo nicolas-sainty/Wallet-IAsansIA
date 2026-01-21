@@ -10,6 +10,7 @@ const walletsRoutes = require('../routes/wallets.routes');
 const transactionsRoutes = require('../routes/transactions.routes');
 const groupsRoutes = require('../routes/groups.routes');
 const eventsRoutes = require('../routes/events.routes');
+const authRoutes = require('../routes/auth.routes');
 
 const app = express();
 const PORT = process.env.API_PORT || 3000;
@@ -75,6 +76,7 @@ app.use('/api/wallets', walletsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/events', eventsRoutes);
+app.use('/api/auth', authRoutes);
 
 // Static files (frontend)
 app.use(express.static('public'));

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Profil - Student Wallet</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/css/index.css">
+</head>
+
+<body>
+    <div class="bg-gradient"></div>
+
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="/" style="text-decoration: none; color: white; font-weight: 700;">Student Wallet</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-secondary" onclick="logout()">Se Déconnecter</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="container" style="max-width: 800px;">
+            <div class="glass" style="padding: 2rem; margin-top: 2rem;">
+                <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 2rem;">
+                    <div
+                        style="width: 80px; height: 80px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; color: white;">
+                        <span id="profileInitials">?</span>
+                    </div>
+                    <div>
+                        <h1 id="profileName" style="margin: 0; font-size: 2rem;">Chargement...</h1>
+                        <p id="profileEmail" style="color: var(--text-secondary); margin: 0;">...</p>
+                        <span id="profileRole"
+                            style="display: inline-block; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-top: 5px;">Student</span>
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid var(--glass-border); padding-top: 2rem;">
+                    <h2>Mes Infos</h2>
+                    <div style="margin-top: 1rem; display: grid; gap: 1rem;">
+                        <div>
+                            <label style="color: var(--text-muted); font-size: 0.9rem;">Statut du compte</label>
+                            <div id="verificationStatus" style="font-weight: 600;">Vérification en attente</div>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-muted); font-size: 0.9rem;">Membre depuis</label>
+                            <div id="joinDate">...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+        }
+
+        async function loadProfile() {
+            const token = localStorage.getItem('token');
+            if (!token) window.location.href = '/login.html';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Session expirée');
+
+                const user = await res.json();
+
+                document.getElementById('profileName').innerText = user.full_name;
+                document.getElementById('profileEmail').innerText = user.email;
+                document.getElementById('profileRole').innerText = user.role.toUpperCase();
+                document.getElementById('profileInitials').innerText = user.full_name.charAt(0).toUpperCase();
+
+                const statusEl = document.getElementById('verificationStatus');
+                if (user.is_verified) {
+                    statusEl.innerText = '✅ Vérifié';
+                    statusEl.style.color = '#10b981';
+                } else {
+                    statusEl.innerText = '⚠️ Non Vérifié';
+                    statusEl.style.color = '#fbbf24';
+                }
+
+                document.getElementById('joinDate').innerText = new Date(user.created_at).toLocaleDateString();
+
+            } catch (error) {
+                logout();
+            }
+        }
+
+        loadProfile();
+    </script>
+</body>
+
+</html>
