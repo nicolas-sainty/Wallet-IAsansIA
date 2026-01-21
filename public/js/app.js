@@ -496,15 +496,12 @@ async function init() {
         });
     }
 
-    // Navigation
+    // Navigation - Highlight active link based on URL if not already hardcoded
+    const currentPath = window.location.pathname;
     document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            e.target.classList.add('active');
-            const target = e.target.getAttribute('href');
-            document.querySelector(target).scrollIntoView({ behavior: 'smooth' });
-        });
+        if (link.getAttribute('href') === currentPath) {
+            link.classList.add('active');
+        }
     });
 
     // Event listeners
@@ -520,15 +517,32 @@ async function init() {
     const createEventBtn = document.getElementById('createEventBtn');
     if (createEventBtn) createEventBtn.addEventListener('click', createEvent);
 
-    // Load initial data
+    // Initial Data Loading based on page presence
     try {
-        await loadGroups();
-        await loadWallets();
-        await loadEvents();
-        await loadTransactions();
-        await updateDashboardStats();
+        // Always load stats for the dashboard if elements exist
+        if (document.getElementById('totalWallets')) {
+            await updateDashboardStats();
+        }
 
-        showToast('Student Wallet prêt !', 'success');
+        // Load specific sections if they exist in the DOM
+        if (document.getElementById('groupsList')) {
+            await loadGroups();
+        }
+
+        if (document.getElementById('walletsList')) {
+            await loadWallets();
+        }
+
+        if (document.getElementById('eventsGrid')) {
+            await loadEvents();
+        }
+
+        if (document.getElementById('transactionsList')) {
+            await loadTransactions();
+        }
+
+        // If checks pass, show ready toast
+        // showToast('Student Wallet prêt !', 'success'); 
     } catch (error) {
         console.error('Initialization error:', error);
         showToast('Erreur de connexion au serveur.', 'error');
