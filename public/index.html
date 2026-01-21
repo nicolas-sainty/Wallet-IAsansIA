@@ -1,15 +1,19 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Epicoin - Système d'Échange Inter-Communautés</title>
-    <meta name="description" content="Plateforme d'échange d'Epicoins entre groupes et communautés - Simple, transparent, équitable">
+    <title>Student Wallet - La Fidélité Étudiante</title>
+    <meta name="description"
+        content="Plateforme de fidélité pour BDE et étudiants. Participe à la vie de l'école et gagne des récompenses.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/css/index.css">
 </head>
+
 <body>
     <!-- Background Effects -->
     <div class="bg-gradient"></div>
@@ -25,35 +29,36 @@
             <div class="nav-brand">
                 <div class="logo">
                     <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                        <circle cx="16" cy="16" r="14" stroke="url(#gradient)" stroke-width="2"/>
-                        <path d="M16 8L20 16L16 24L12 16L16 8Z" fill="url(#gradient)"/>
+                        <circle cx="16" cy="16" r="14" stroke="url(#gradient)" stroke-width="2" />
+                        <path d="M16 8L20 16L16 24L12 16L16 8Z" fill="url(#gradient)" />
                         <defs>
                             <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32">
-                                <stop offset="0%" stop-color="#667eea"/>
-                                <stop offset="100%" stop-color="#764ba2"/>
+                                <stop offset="0%" stop-color="#ff7eb3" />
+                                <stop offset="100%" stop-color="#ff758c" />
                             </linearGradient>
                         </defs>
                     </svg>
-                    <span>Epicoin</span>
+                    <span>Student Wallet</span>
                 </div>
             </div>
             <div class="nav-menu">
                 <a href="#dashboard" class="nav-link active">Dashboard</a>
-                <a href="#wallets" class="nav-link">Wallets</a>
-                <a href="#groups" class="nav-link">Groupes</a>
-                <a href="#transactions" class="nav-link">Transactions</a>
+                <a href="#wallets" class="nav-link">Mon Compte</a>
+                <a href="#events" class="nav-link">Événements</a>
+                <a href="#groups" class="nav-link">Assos & BDE</a>
             </div>
             <div class="nav-actions">
                 <button class="btn-secondary" id="themeToggle">
                     <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/>
+                        <path
+                            d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" />
                     </svg>
                 </button>
                 <button class="btn-primary" id="createWalletBtn">
                     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
-                    Créer Wallet
+                    Rejoindre
                 </button>
             </div>
         </div>
@@ -65,58 +70,68 @@
             <!-- Welcome Section -->
             <section id="dashboard" class="section">
                 <div class="welcome-header">
-                    <h1>Bienvenue sur Epicoin</h1>
-                    <p>Système d'échange décentralisé pour communautés</p>
+                    <h1>L'appli de ton école</h1>
+                    <p>Participe aux événements, soutiens tes assos et cumule des points !</p>
                 </div>
 
                 <!-- Stats Cards -->
                 <div class="stats-grid">
                     <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);">
                             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                         </div>
                         <div class="stat-content">
-                            <p class="stat-label">Wallets Actifs</p>
+                            <p class="stat-label">Étudiants Actifs</p>
                             <p class="stat-value" id="totalWallets">0</p>
                         </div>
                     </div>
 
                     <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);">
                             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                             </svg>
                         </div>
                         <div class="stat-content">
-                            <p class="stat-label">Groupes</p>
+                            <p class="stat-label">BDE & Assos</p>
                             <p class="stat-value" id="totalGroups">0</p>
                         </div>
                     </div>
 
                     <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);">
                             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                         <div class="stat-content">
-                            <p class="stat-label">Transactions</p>
-                            <p class="stat-value" id="totalTransactions">0</p>
+                            <p class="stat-label">Événements à venir</p>
+                            <p class="stat-value" id="totalEvents">3</p> <!-- Mock for now -->
                         </div>
                     </div>
+                </div>
+            </section>
 
-                    <div class="stat-card glass">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
-                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
-                        </div>
-                        <div class="stat-content">
-                            <p class="stat-label">Volume Total</p>
-                            <p class="stat-value"><span id="totalVolume">0</span> EPIC</p>
-                        </div>
+            <!-- Events Section -->
+            <section id="events" class="section">
+                <div class="section-header">
+                    <h2>Événements Campus</h2>
+                    <button class="btn-primary" id="createEventBtn">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Créer Événement
+                    </button>
+                </div>
+                <div id="eventsGrid" class="events-grid">
+                    <!-- Events will be populated here -->
+                    <div class="empty-state">
+                        <p>Chargement des événements...</p>
                     </div>
                 </div>
             </section>
@@ -124,76 +139,39 @@
             <!-- Wallets Section -->
             <section id="wallets" class="section">
                 <div class="section-header">
-                    <h2>Mes Wallets</h2>
+                    <h2>Mes Points</h2>
                     <button class="btn-primary" id="addWalletBtn">
                         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                         </svg>
-                        Nouveau Wallet
+                        Créer Compte
                     </button>
                 </div>
                 <div id="walletsList" class="wallets-list"></div>
             </section>
 
-            <!-- Transfer Section -->
-            <section id="transfer" class="section">
-                <div class="section-header">
-                    <h2>Transfert Rapide</h2>
-                </div>
-                <div class="glass transfer-form">
-                    <form id="transferForm">
-                        <div class="form-group">
-                            <label for="fromWallet">Depuis Wallet</label>
-                            <select id="fromWallet" required>
-                                <option value="">Sélectionner un wallet</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="toWallet">Vers Wallet</label>
-                            <input type="text" id="toWallet" placeholder="ID du wallet destinataire" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="amount">Montant (EPIC)</label>
-                            <input type="number" id="amount" step="0.01" min="0.01" placeholder="0.00" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="description">Description (optionnel)</label>
-                            <input type="text" id="description" placeholder="Raison du transfert">
-                        </div>
-                        <button type="submit" class="btn-primary btn-large">
-                            Envoyer Epicoins
-                        </button>
-                    </form>
-                </div>
-            </section>
-
-            <!-- Transactions Section -->
-            <section id="transactions" class="section">
-                <div class="section-header">
-                    <h2>Historique des Transactions</h2>
-                    <div class="filter-buttons">
-                        <button class="filter-btn active" data-status="all">Toutes</button>
-                        <button class="filter-btn" data-status="SUCCESS">Réussies</button>
-                        <button class="filter-btn" data-status="PENDING">En Attente</button>
-                        <button class="filter-btn" data-status="FAILED">Échouées</button>
-                    </div>
-                </div>
-                <div id="transactionsList" class="transactions-list"></div>
-            </section>
-
             <!-- Groups Section -->
             <section id="groups" class="section">
                 <div class="section-header">
-                    <h2>Groupes & Communautés</h2>
+                    <h2>Associations & BDE</h2>
                     <button class="btn-primary" id="createGroupBtn">
                         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                         </svg>
-                        Créer Groupe
+                        Créer Asso
                     </button>
                 </div>
                 <div id="groupsList" class="groups-grid"></div>
             </section>
+
+            <!-- Transactions Section (Moved down) -->
+            <section id="transactions" class="section">
+                <div class="section-header">
+                    <h2>Historique des Activités</h2>
+                </div>
+                <div id="transactionsList" class="transactions-list"></div>
+            </section>
+
         </div>
     </main>
 
@@ -205,4 +183,5 @@
 
     <script src="/js/app.js"></script>
 </body>
+
 </html>

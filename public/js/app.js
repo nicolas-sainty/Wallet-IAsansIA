@@ -1,5 +1,5 @@
 // ========================================
-// Epicoin Exchange System - App Logic
+// Student Wallet - App Logic
 // ========================================
 
 const API_BASE = window.location.origin;
@@ -12,6 +12,7 @@ const state = {
     wallets: [],
     groups: [],
     transactions: [],
+    events: [],
     currentWallet: null,
     currentFilter: 'all',
 };
@@ -79,8 +80,8 @@ function formatDate(dateString) {
 
 function formatAmount(amount) {
     return parseFloat(amount).toLocaleString('fr-FR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 8,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
     });
 }
 
@@ -112,10 +113,111 @@ async function updateDashboardStats() {
 
         document.getElementById('totalWallets').textContent = totalWallets;
         document.getElementById('totalGroups').textContent = groups.length;
-        document.getElementById('totalTransactions').textContent = totalTransactions;
-        document.getElementById('totalVolume').textContent = formatAmount(totalVolume);
+        document.getElementById('totalEvents').textContent = state.events.length;
     } catch (error) {
         console.error('Error updating stats:', error);
+    }
+}
+
+// ========================================
+// Event Management
+// ========================================
+
+async function createEvent() {
+    const groupsData = await api.get('/api/groups');
+    const groups = groupsData.data || [];
+
+    if (groups.length === 0) {
+        showToast('Créez d\'abord un groupe (Asso/BDE) !', 'error');
+        return;
+    }
+
+    const title = prompt('Titre de l\'événement :');
+    if (!title) return;
+
+    const rewardPoints = prompt('Points de récompense :', '50');
+    if (!rewardPoints) return;
+
+    // Use first group as organizer for simplicity in this demo
+    const groupId = groups[0].group_id;
+
+    try {
+        await api.post('/api/events', {
+            groupId,
+            title,
+            description: 'Un super événement campus !',
+            eventDate: new Date().toISOString(),
+            rewardPoints: parseFloat(rewardPoints)
+        });
+
+        showToast('Événement créé avec succès !', 'success');
+        await loadEvents();
+        updateDashboardStats();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function loadEvents() {
+    try {
+        const result = await api.get('/api/events');
+        state.events = result.data || [];
+        renderEvents();
+    } catch (error) {
+        console.error('Error loading events:', error);
+    }
+}
+
+function renderEvents() {
+    const container = document.getElementById('eventsGrid');
+
+    if (state.events.length === 0) {
+        container.innerHTML = `
+            <div class="glass" style="padding: 2rem; text-align: center; grid-column: 1 / -1;">
+                <p style="color: var(--text-secondary);">Aucun événement à venir</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = state.events.map(event => `
+        <div class="event-card">
+            <div class="event-image">
+                <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <div class="event-content">
+                <div class="event-date">${formatDate(event.event_date)}</div>
+                <h3 class="event-title">${event.title}</h3>
+                <p class="event-description">${event.description || 'Pas de description'}</p>
+                <div class="event-footer">
+                    <span class="event-reward">+${event.reward_points} pts</span>
+                    <button class="btn-primary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" 
+                            onclick="participateInEvent('${event.event_id}')">
+                        Participer
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function participateInEvent(eventId) {
+    if (state.wallets.length === 0) {
+        showToast('Créez d\'abord un wallet étudiant !', 'error');
+        return;
+    }
+
+    // Pick first wallet as participant for demo
+    const walletId = state.wallets[0].wallet_id;
+
+    try {
+        await api.post(`/api/events/${eventId}/participate`, { walletId });
+        showToast('Participation enregistrée ! Points crédités.', 'success');
+        await loadWallets(); // Update balance
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 }
 
@@ -128,19 +230,19 @@ async function createWallet() {
     const groups = groupsData.data || [];
 
     if (groups.length === 0) {
-        showToast('Créez d\'abord un groupe avant de créer un wallet', 'error');
+        showToast('Aucune association trouvée. Créez-en une d\'abord !', 'error');
         return;
     }
 
-    const groupId = groups[0].group_id; // Use first group for demo
+    const groupId = groups[0].group_id;
 
     try {
-        const result = await api.post('/api/wallets', {
+        await api.post('/api/wallets', {
             groupId,
-            currency: 'EPIC',
+            currency: 'PTS',
         });
 
-        showToast('Wallet créé avec succès !', 'success');
+        showToast('Compte étudiant créé !', 'success');
         await loadWallets();
         updateDashboardStats();
     } catch (error) {
@@ -163,7 +265,7 @@ async function loadWallets() {
         }
 
         renderWallets();
-        updateWalletSelect();
+        // updateWalletSelect(); // If we keep transfers
     } catch (error) {
         console.error('Error loading wallets:', error);
     }
@@ -175,8 +277,8 @@ function renderWallets() {
     if (state.wallets.length === 0) {
         container.innerHTML = `
       <div class="glass" style="padding: 3rem; text-align: center;">
-        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Aucun wallet trouvé</p>
-        <button class="btn-primary" onclick="createWallet()">Créer votre premier wallet</button>
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Pas encore de compte ?</p>
+        <button class="btn-primary" onclick="createWallet()">Créer mon compte</button>
       </div>
     `;
         return;
@@ -189,161 +291,27 @@ function renderWallets() {
           <small style="color: var(--text-muted);">${wallet.group_name || 'N/A'}</small>
           <p class="wallet-id">${truncateId(wallet.wallet_id)}</p>
         </div>
-        <span class="transaction-status success">${wallet.status}</span>
+        <span class="transaction-status success">Actif</span>
       </div>
-      <div class="wallet-balance">${formatAmount(wallet.balance)}</div>
-      <div class="wallet-currency">${wallet.currency}</div>
+      <div class="wallet-balance">${formatAmount(wallet.balance)} pts</div>
       <div class="wallet-actions">
         <button class="btn-secondary" onclick="viewWalletDetails('${wallet.wallet_id}')">Détails</button>
-        <button class="btn-primary" onclick="prepareTransfer('${wallet.wallet_id}')">Envoyer</button>
       </div>
     </div>
   `).join('');
-}
-
-function updateWalletSelect() {
-    const select = document.getElementById('fromWallet');
-    select.innerHTML = '<option value="">Sélectionner un wallet</option>' +
-        state.wallets.map(w => `
-      <option value="${w.wallet_id}">
-        ${truncateId(w.wallet_id)} - ${formatAmount(w.balance)} ${w.currency}
-      </option>
-    `).join('');
 }
 
 async function viewWalletDetails(walletId) {
     try {
         const result = await api.get(`/api/wallets/${walletId}`);
         const wallet = result.data;
-
         const balance = await api.get(`/api/wallets/${walletId}/balance`);
 
-        alert(`Wallet: ${wallet.wallet_id}\nBalance confirmé: ${formatAmount(balance.data.confirmedBalance)} ${wallet.currency}\nBalance disponible: ${formatAmount(balance.data.availableBalance)} ${wallet.currency}\nStatut: ${wallet.status}`);
+        // Simple alert for now
+        alert(`Solde actuel : ${formatAmount(balance.data.confirmedBalance)} points`);
     } catch (error) {
         showToast(error.message, 'error');
     }
-}
-
-function prepareTransfer(walletId) {
-    document.getElementById('fromWallet').value = walletId;
-    document.getElementById('transfer').scrollIntoView({ behavior: 'smooth' });
-}
-
-// ========================================
-// Transaction Management
-// ========================================
-
-async function handleTransfer(event) {
-    event.preventDefault();
-
-    const sourceWalletId = document.getElementById('fromWallet').value;
-    const destinationWalletId = document.getElementById('toWallet').value;
-    const amount = parseFloat(document.getElementById('amount').value);
-    const description = document.getElementById('description').value;
-
-    if (!sourceWalletId || !destinationWalletId || !amount) {
-        showToast('Veuillez remplir tous les champs obligatoires', 'error');
-        return;
-    }
-
-    const sourceWallet = state.wallets.find(w => w.wallet_id === sourceWalletId);
-    if (!sourceWallet) {
-        showToast('Wallet source introuvable', 'error');
-        return;
-    }
-
-    try {
-        const result = await api.post('/api/transactions', {
-            initiatorUserId: sourceWallet.user_id,
-            sourceWalletId,
-            destinationWalletId,
-            amount,
-            currency: 'EPIC',
-            transactionType: 'P2P',
-            description,
-        });
-
-        showToast('Transaction initiée avec succès !', 'success');
-
-        // Reset form
-        event.target.reset();
-
-        // Reload data
-        setTimeout(async () => {
-            await loadTransactions();
-            await loadWallets();
-            updateDashboardStats();
-        }, 2000);
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-async function loadTransactions() {
-    try {
-        state.transactions = [];
-
-        for (const wallet of state.wallets) {
-            const result = await api.get(`/api/wallets/${wallet.wallet_id}/transactions`);
-            if (result.data) {
-                state.transactions.push(...result.data);
-            }
-        }
-
-        // Sort by date descending
-        state.transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-        renderTransactions();
-    } catch (error) {
-        console.error('Error loading transactions:', error);
-    }
-}
-
-function renderTransactions() {
-    const container = document.getElementById('transactionsList');
-
-    const filtered = state.currentFilter === 'all'
-        ? state.transactions
-        : state.transactions.filter(t => t.status === state.currentFilter);
-
-    if (filtered.length === 0) {
-        container.innerHTML = `
-      <div class="glass" style="padding: 2rem; text-align: center;">
-        <p style="color: var(--text-secondary);">Aucune transaction trouvée</p>
-      </div>
-    `;
-        return;
-    }
-
-    container.innerHTML = filtered.map(tx => {
-        const isOutgoing = state.wallets.some(w => w.wallet_id === tx.source_wallet_id);
-
-        return `
-      <div class="transaction-card glass">
-        <div class="transaction-icon ${isOutgoing ? 'outgoing' : 'incoming'}">
-          <svg width="24" height="24" fill="none" stroke="white" viewBox="0 0 24 24">
-            ${isOutgoing
-                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>'
-                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"/>'
-            }
-          </svg>
-        </div>
-        <div class="transaction-info">
-          <p class="transaction-description">${tx.description || (isOutgoing ? 'Envoi' : 'Réception')}</p>
-          <p class="transaction-meta">
-            ${formatDate(tx.created_at)} · ${tx.transaction_type}
-            <br><small style="font-family: monospace;">${truncateId(tx.transaction_id)}</small>
-          </p>
-        </div>
-        <div style="text-align: right;">
-          <p class="transaction-amount ${isOutgoing ? 'outgoing' : 'incoming'}">
-            ${isOutgoing ? '-' : '+'}${formatAmount(tx.amount)} ${tx.currency}
-          </p>
-          <span class="transaction-status ${tx.status.toLowerCase()}">${tx.status}</span>
-        </div>
-      </div>
-    `;
-    }).join('');
 }
 
 // ========================================
@@ -351,19 +319,19 @@ function renderTransactions() {
 // ========================================
 
 async function createGroup() {
-    const groupName = prompt('Nom du groupe:');
+    const groupName = prompt('Nom de l\'asso / BDE :');
     if (!groupName) return;
 
     try {
-        const adminUserId = crypto.randomUUID(); // Generate admin ID
+        const adminUserId = crypto.randomUUID();
 
-        const result = await api.post('/api/groups', {
+        await api.post('/api/groups', {
             groupName,
             adminUserId,
             settings: {},
         });
 
-        showToast('Groupe créé avec succès !', 'success');
+        showToast('Association créée !', 'success');
         await loadGroups();
         updateDashboardStats();
     } catch (error) {
@@ -387,30 +355,21 @@ async function renderGroups() {
     if (state.groups.length === 0) {
         container.innerHTML = `
       <div class="glass" style="padding: 3rem; text-align: center; grid-column: 1 / -1;">
-        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Aucun groupe trouvé</p>
-        <button class="btn-primary" onclick="createGroup()">Créer votre premier groupe</button>
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Aucune asso enregistrée</p>
+        <button class="btn-primary" onclick="createGroup()">Enregistrer une asso</button>
       </div>
     `;
         return;
     }
 
     const groupsHtml = await Promise.all(state.groups.map(async (group) => {
-        let stats = { total_wallets: 0, total_transactions: 0, total_volume: 0 };
-        let trustScores = [];
-
+        let stats = { total_wallets: 0, total_volume: 0 };
         try {
             const statsResult = await api.get(`/api/groups/${group.group_id}/stats`);
             stats = statsResult.data || stats;
-
-            const trustResult = await api.get(`/api/groups/${group.group_id}/trust-scores`);
-            trustScores = trustResult.data || [];
         } catch (error) {
             console.error('Error loading group data:', error);
         }
-
-        const avgTrust = trustScores.length > 0
-            ? trustScores.reduce((sum, t) => sum + parseFloat(t.trust_score), 0) / trustScores.length
-            : 50;
 
         return `
       <div class="group-card glass">
@@ -419,26 +378,13 @@ async function renderGroups() {
         </div>
         <div class="group-stats">
           <div class="group-stat">
-            <span class="group-stat-label">Membres</span>
+            <span class="group-stat-label">Adhérents</span>
             <span class="group-stat-value">${stats.total_wallets || 0}</span>
           </div>
           <div class="group-stat">
-            <span class="group-stat-label">Transactions</span>
-            <span class="group-stat-value">${stats.total_transactions || 0}</span>
+            <span class="group-stat-label">Points Distribués</span>
+            <span class="group-stat-value">${formatAmount(stats.total_volume || 0)}</span>
           </div>
-          <div class="group-stat">
-            <span class="group-stat-label">Volume</span>
-            <span class="group-stat-value">${formatAmount(stats.total_volume || 0)} EPIC</span>
-          </div>
-        </div>
-        <div class="trust-score">
-          <p class="trust-score-label">Score de Confiance Moyen</p>
-          <div class="trust-score-bar">
-            <div class="trust-score-fill" style="width: ${avgTrust}%"></div>
-          </div>
-          <p style="text-align: right; margin-top: 0.25rem; font-size: 0.875rem; font-weight: 600;">
-            ${avgTrust.toFixed(1)}/100
-          </p>
         </div>
       </div>
     `;
@@ -447,53 +393,55 @@ async function renderGroups() {
     container.innerHTML = groupsHtml.join('');
 }
 
-// ========================================
-// Filter Management
-// ========================================
-
-function setupFilters() {
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            state.currentFilter = e.target.dataset.status;
-            renderTransactions();
-        });
-    });
-}
 
 // ========================================
-// Theme Toggle
+// Transaction Management (Simplified)
 // ========================================
 
-function setupThemeToggle() {
-    const btn = document.getElementById('themeToggle');
-    btn.addEventListener('click', () => {
-        document.body.classList.toggle('light-theme');
-        localStorage.setItem('theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
-    });
-
-    // Load saved theme
-    if (localStorage.getItem('theme') === 'light') {
-        document.body.classList.add('light-theme');
+async function loadTransactions() {
+    try {
+        state.transactions = [];
+        for (const wallet of state.wallets) {
+            const result = await api.get(`/api/wallets/${wallet.wallet_id}/transactions`);
+            if (result.data) {
+                state.transactions.push(...result.data);
+            }
+        }
+        state.transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        renderTransactions();
+    } catch (error) {
+        console.error('Error loading transactions:', error);
     }
 }
 
-// ========================================
-// Navigation
-// ========================================
+function renderTransactions() {
+    const container = document.getElementById('transactionsList');
 
-function setupNavigation() {
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            e.target.classList.add('active');
+    if (state.transactions.length === 0) {
+        container.innerHTML = `
+      <div class="glass" style="padding: 2rem; text-align: center;">
+        <p style="color: var(--text-secondary);">Aucune activité récente</p>
+      </div>
+    `;
+        return;
+    }
 
-            const target = e.target.getAttribute('href');
-            document.querySelector(target).scrollIntoView({ behavior: 'smooth' });
-        });
-    });
+    container.innerHTML = state.transactions.map(tx => `
+      <div class="transaction-card glass">
+        <div class="transaction-icon incoming">
+          <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="transaction-info">
+          <p class="transaction-description">Gain de points</p>
+          <p class="transaction-meta">${formatDate(tx.created_at)}</p>
+        </div>
+        <div style="text-align: right;">
+          <p class="transaction-amount incoming">+${formatAmount(tx.amount)} pts</p>
+        </div>
+      </div>
+    `).join('');
 }
 
 // ========================================
@@ -501,29 +449,51 @@ function setupNavigation() {
 // ========================================
 
 async function init() {
-    console.log('🚀 Initializing Epicoin App...');
+    console.log('🚀 Initializing Student Wallet...');
 
-    setupThemeToggle();
-    setupNavigation();
-    setupFilters();
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('light-theme');
+        });
+    }
+
+    // Navigation
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            e.target.classList.add('active');
+            const target = e.target.getAttribute('href');
+            document.querySelector(target).scrollIntoView({ behavior: 'smooth' });
+        });
+    });
 
     // Event listeners
-    document.getElementById('createWalletBtn').addEventListener('click', createWallet);
-    document.getElementById('addWalletBtn').addEventListener('click', createWallet);
-    document.getElementById('createGroupBtn').addEventListener('click', createGroup);
-    document.getElementById('transferForm').addEventListener('submit', handleTransfer);
+    const createWalletBtn = document.getElementById('createWalletBtn');
+    if (createWalletBtn) createWalletBtn.addEventListener('click', createWallet);
+
+    const addWalletBtn = document.getElementById('addWalletBtn');
+    if (addWalletBtn) addWalletBtn.addEventListener('click', createWallet);
+
+    const createGroupBtn = document.getElementById('createGroupBtn');
+    if (createGroupBtn) createGroupBtn.addEventListener('click', createGroup);
+
+    const createEventBtn = document.getElementById('createEventBtn');
+    if (createEventBtn) createEventBtn.addEventListener('click', createEvent);
 
     // Load initial data
     try {
         await loadGroups();
         await loadWallets();
+        await loadEvents();
         await loadTransactions();
         await updateDashboardStats();
 
-        showToast('Application chargée avec succès !', 'success');
+        showToast('Student Wallet prêt !', 'success');
     } catch (error) {
         console.error('Initialization error:', error);
-        showToast('Erreur de chargement. Vérifiez que le serveur est en cours d\'exécution.', 'error');
+        showToast('Erreur de connexion au serveur.', 'error');
     }
 }
 

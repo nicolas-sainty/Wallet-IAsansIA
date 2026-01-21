@@ -9,6 +9,7 @@ const logger = require('../config/logger');
 const walletsRoutes = require('../routes/wallets.routes');
 const transactionsRoutes = require('../routes/transactions.routes');
 const groupsRoutes = require('../routes/groups.routes');
+const eventsRoutes = require('../routes/events.routes');
 
 const app = express();
 const PORT = process.env.API_PORT || 3000;
@@ -73,6 +74,7 @@ app.get('/api', (req, res) => {
 app.use('/api/wallets', walletsRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/groups', groupsRoutes);
+app.use('/api/events', eventsRoutes);
 
 // Static files (frontend)
 app.use(express.static('public'));
