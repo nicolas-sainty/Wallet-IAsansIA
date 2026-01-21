@@ -63,6 +63,7 @@
             font-size: 2rem;
             margin-bottom: 0.5rem;
             background: var(--gradient-primary);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -147,20 +148,35 @@
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
 
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                tabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-
-                if (tab.dataset.target === 'loginLink') {
-                    loginForm.style.display = 'block';
-                    registerForm.style.display = 'none';
+        function switchTab(target) {
+            tabs.forEach(tab => {
+                if (tab.dataset.target === target) {
+                    tab.classList.add('active');
                 } else {
-                    loginForm.style.display = 'none';
-                    registerForm.style.display = 'block';
+                    tab.classList.remove('active');
                 }
             });
+
+            if (target === 'loginLink') {
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
+            } else {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'block';
+            }
+        }
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                switchTab(tab.dataset.target);
+            });
         });
+
+        // Handle URL Params
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('tab') === 'register') {
+            switchTab('registerLink');
+        }
     </script>
 </body>
 

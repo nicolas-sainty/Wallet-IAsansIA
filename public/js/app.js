@@ -225,7 +225,13 @@ async function participateInEvent(eventId) {
 // Wallet Management
 // ========================================
 
-async function createWallet() {
+async function createWallet(e) {
+    if (e) e.preventDefault();
+    if (!checkAuth()) {
+        window.location.href = '/login.html?tab=register';
+        return;
+    }
+
     const groupsData = await api.get('/api/groups');
     const groups = groupsData.data || [];
 
@@ -469,7 +475,7 @@ function updateNavAuth() {
     } else {
         navActions.innerHTML = `
             <a href="/login.html" class="btn-secondary" style="text-decoration: none;">Se Connecter</a>
-            <button class="btn-primary" onclick="window.location.href='/login.html'">Rejoindre</button>
+            <a href="/login.html?tab=register" class="btn-primary" style="text-decoration: none;">Rejoindre</a>
         `;
     }
 }
