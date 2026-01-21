@@ -11,12 +11,22 @@ const transactionsRoutes = require('../routes/transactions.routes');
 const groupsRoutes = require('../routes/groups.routes');
 const eventsRoutes = require('../routes/events.routes');
 const authRoutes = require('../routes/auth.routes');
+const webhookRoutes = require('../routes/webhooks.routes');
 
 const app = express();
 const PORT = process.env.API_PORT || 3000;
 
 // Security middleware
-app.use(helmet());
+// Security middleware
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+            "script-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            "connect-src": ["'self'", "https://fonts.googleapis.com"]
+        },
+    },
+}));
 
 // CORS configuration
 app.use(cors({
@@ -77,6 +87,7 @@ app.use('/api/transactions', transactionsRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Static files (frontend)
 app.use(express.static('public'));
