@@ -35,8 +35,14 @@ const api = {
             body: JSON.stringify(data),
         });
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || response.statusText);
+            let errorMsg;
+            try {
+                const error = await response.json();
+                errorMsg = error.error || response.statusText;
+            } catch (e) {
+                errorMsg = await response.text() || response.statusText;
+            }
+            throw new Error(errorMsg);
         }
         return await response.json();
     },
@@ -194,7 +200,7 @@ function renderEvents() {
                 <div class="event-footer">
                     <span class="event-reward">+${event.reward_points} pts</span>
                     <button class="btn-primary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" 
-                            onclick="participateInEvent('${event.event_id}')">
+                            onclick="participateInEvent('${event.event_id}', this)">
                         Participer
                     </button>
                 </div>
@@ -203,21 +209,39 @@ function renderEvents() {
     `).join('');
 }
 
-async function participateInEvent(eventId) {
+async function participateInEvent(eventId, btnElement) {
     if (state.wallets.length === 0) {
         showToast('Créez d\'abord un wallet étudiant !', 'error');
         return;
     }
 
-    // Pick first wallet as participant for demo
+    // Visual feedback
+    if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.innerHTML = '<span class="spinner"></span> ...';
+    }
+
     const walletId = state.wallets[0].wallet_id;
 
     try {
-        await api.post(`/api/events/${eventId}/participate`, { walletId });
-        showToast('Participation enregistrée ! Points crédités.', 'success');
-        await loadWallets(); // Update balance
+        const result = await api.post(`/api/events/${eventId}/participate`, { walletId });
+
+        showToast('Inscription validée ! En attente du BDE.', 'success');
+
+        // Update UI locally without reload to show "Pending" state
+        // Find the event card and update the footer
+        if (btnElement) {
+            btnElement.textContent = 'En attente';
+            btnElement.classList.replace('btn-primary', 'btn-secondary');
+            btnElement.style.opacity = '0.7';
+        }
+
     } catch (error) {
         showToast(error.message, 'error');
+        if (btnElement) {
+            btnElement.disabled = false;
+            btnElement.textContent = 'Participer';
+        }
     }
 }
 
@@ -232,14 +256,21 @@ async function createWallet(e) {
         return;
     }
 
+    // Single Wallet Rule: Check if user already has a wallet
+    if (state.wallets && state.wallets.length > 0) {
+        showToast('Vous avez déjà un compte BDE actif !', 'error');
+        return;
+    }
+
     const groupsData = await api.get('/api/groups');
     const groups = groupsData.data || [];
 
     if (groups.length === 0) {
-        showToast('Aucune association trouvée. Créez-en une d\'abord !', 'error');
+        showToast('Aucun BDE disponible.', 'error');
         return;
     }
 
+    // Auto-select the first (and only) BDE
     const groupId = groups[0].group_id;
 
     try {
@@ -257,21 +288,17 @@ async function createWallet(e) {
 }
 
 async function loadWallets() {
+    if (!checkAuth()) return;
+
     try {
-        const groupsData = await api.get('/api/groups');
-        const groups = groupsData.data || [];
+        const token = localStorage.getItem('token');
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const userId = payload.userId;
 
-        state.wallets = [];
-
-        for (const group of groups) {
-            const members = await api.get(`/api/groups/${group.group_id}/members`);
-            if (members.data) {
-                state.wallets.push(...members.data.map(w => ({ ...w, group_name: group.group_name })));
-            }
-        }
+        const response = await api.get(`/api/wallets?userId=${userId}`);
+        state.wallets = response.data || [];
 
         renderWallets();
-        // updateWalletSelect(); // If we keep transfers
     } catch (error) {
         console.error('Error loading wallets:', error);
     }
@@ -280,9 +307,16 @@ async function loadWallets() {
 function renderWallets() {
     const container = document.getElementById('walletsList');
 
+    // Calculate Total Balance
+    const totalBalance = state.wallets.reduce((sum, w) => sum + parseFloat(w.balance), 0);
+    const balanceDisplay = document.getElementById('totalBalanceDisplay');
+    if (balanceDisplay) {
+        balanceDisplay.textContent = formatAmount(totalBalance);
+    }
+
     if (state.wallets.length === 0) {
         container.innerHTML = `
-      <div class="glass" style="padding: 3rem; text-align: center;">
+      <div class="glass" style="padding: 3rem; text-align: center; grid-column: 1 / -1;">
         <p style="color: var(--text-secondary); margin-bottom: 1rem;">Pas encore de compte ?</p>
         <button class="btn-primary" onclick="createWallet()">Créer mon compte</button>
       </div>
@@ -290,21 +324,32 @@ function renderWallets() {
         return;
     }
 
-    container.innerHTML = state.wallets.map(wallet => `
-    <div class="wallet-card glass">
-      <div class="wallet-header">
-        <div>
-          <small style="color: var(--text-muted);">${wallet.group_name || 'N/A'}</small>
-          <p class="wallet-id">${truncateId(wallet.wallet_id)}</p>
+    container.innerHTML = state.wallets.map((wallet, index) => {
+        // Generate a random gradient class for variety
+        // const gradientClass = `card-gradient-${(index % 3) + 1}`; 
+
+        return `
+    <div class="credit-card" onclick="viewWalletDetails('${wallet.wallet_id}')" style="cursor: pointer;">
+        <div class="card-top">
+            <div class="card-chip"></div>
+            <div class="card-contactless">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a14 14 0 00-2.833-6.663l-.053-.09M19.5 11a7.5 7.5 0 00-15 0m15 0a7.5 7.5 0 00-15 0" />
+                </svg>
+            </div>
         </div>
-        <span class="transaction-status success">Actif</span>
-      </div>
-      <div class="wallet-balance">${formatAmount(wallet.balance)} pts</div>
-      <div class="wallet-actions">
-        <button class="btn-secondary" onclick="viewWalletDetails('${wallet.wallet_id}')">Détails</button>
-      </div>
+        
+        <div class="card-balance">${formatAmount(wallet.balance)} pts</div>
+        
+        <div class="card-bottom">
+            <div class="card-holder">
+                <span>Titulaire</span>
+                <strong>${wallet.group_name || 'Étudiant'}</strong>
+            </div>
+            <div class="card-logo">EPICOIN</div>
+        </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 async function viewWalletDetails(walletId) {

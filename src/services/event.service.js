@@ -107,24 +107,24 @@ class EventService {
 
         // Transaction to ensure atomicity (SQLite serialized mode handles this mostly, but good practice)
         // 1. Record participation
+        // 1. Record participation with PENDING status
         await runQuery(
-            `INSERT INTO event_participants (participant_id, event_id, wallet_id, points_earned)
-             VALUES (?, ?, ?, ?)`,
+            `INSERT INTO event_participants (participant_id, event_id, wallet_id, points_earned, status)
+             VALUES (?, ?, ?, ?, 'PENDING')`,
             [participantId, eventId, walletId, event.reward_points]
         );
 
-        // 2. Credit wallet (Using raw update for simplicity, ideally call WalletService)
-        // We assume WalletService logic is simple enough here or we inject it. 
-        // For speed, let's update directly but log it.
-        await runQuery(
-            `UPDATE wallets SET balance = balance + ? WHERE wallet_id = ?`,
-            [event.reward_points, walletId]
-        );
+        // 2. DO NOT Credit wallet yet - Wait for BDE validation
+        // await runQuery(
+        //     `UPDATE wallets SET balance = balance + ? WHERE wallet_id = ?`,
+        //     [event.reward_points, walletId]
+        // );
 
-        logger.info(`Participation recorded: Event ${eventId}, Wallet ${walletId}, Points ${event.reward_points}`);
+        logger.info(`Participation recorded (PENDING): Event ${eventId}, Wallet ${walletId}, Points ${event.reward_points}`);
 
         return {
             participantId,
+            status: 'PENDING',
             pointsEarned: event.reward_points
         };
     }
