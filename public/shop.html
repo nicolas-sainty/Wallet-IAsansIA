@@ -3,220 +3,125 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Boutique - Student Wallet</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Shop - Student Wallet</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/css/index.css">
+    <link rel="stylesheet" href="/css/mobile.css">
     <style>
         .shop-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-top: 20px;
         }
 
-        .product-card {
-            background: var(--glass-bg);
+        .shop-item {
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--glass-border);
-            border-radius: var(--radius-lg);
-            padding: 2rem;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
+            border-radius: 16px;
+            padding: 20px;
             display: flex;
-            flex-direction: column;
-            transition: transform 0.3s ease;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .product-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--color-orange);
-        }
-
-        .product-price {
-            font-size: 2.5rem;
-            font-weight: 800;
-            color: var(--color-orange);
-            margin: 1rem 0;
-        }
-
-        .product-points {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--color-cream);
-            margin-bottom: 0.5rem;
-        }
-
-        .product-bonus {
-            background: rgba(16, 185, 129, 0.2);
-            color: #34d399;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            display: inline-block;
-            margin-bottom: 1rem;
-        }
-
-        .popular-tag {
-            position: absolute;
-            top: 20px;
-            right: -30px;
-            background: var(--color-orange);
+        .item-info h3 {
+            margin: 0 0 5px 0;
             color: white;
-            padding: 5px 40px;
-            transform: rotate(45deg);
-            font-weight: 700;
-            font-size: 0.8rem;
+        }
+
+        .item-info p {
+            margin: 0;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .item-price {
+            background: var(--primary-color);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            text-decoration: none;
         }
     </style>
 </head>
 
 <body>
-    <div class="bg-gradient"></div>
-
-    <nav class="navbar">
-        <div class="container">
-            <div class="nav-brand">
-                <a href="/" style="text-decoration: none; color: white; font-weight: 700;">Student Wallet</a>
-            </div>
-            <div class="nav-menu">
-                <a href="/shop.html" class="nav-link active">Boutique</a>
-                <a href="/profile.html" class="nav-link">Profil</a>
-            </div>
-            <div class="nav-actions">
-                <button class="btn-secondary" onclick="logout()">Se Déconnecter</button>
-            </div>
-        </div>
-    </nav>
-
-    <main class="main-content">
-        <div class="container">
-            <div class="welcome-header" style="text-align: left; padding: 2rem 0;">
-                <h1 style="font-size: 2.5rem;">Recharger mes points</h1>
-                <p>Supporte ton BDE et obtiens des crédits pour les événements.</p>
-            </div>
+    <div class="app-container">
+        <main class="main-content">
+            <h1 style="text-align: center; margin-bottom: 10px;">Boutique</h1>
+            <p style="text-align: center; color: #888; margin-top: 0;">Achète des crédits pour ton association</p>
 
             <div class="shop-grid">
-                <!-- Product 1 -->
-                <div class="product-card">
-                    <div class="product-points">1000 Pts</div>
-                    <div class="product-price">10.00 €</div>
-                    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Idéal pour commencer l'année.</p>
-                    <button class="btn-primary" style="justify-content: center;"
-                        onclick="buyProduct('product_10_eur', 10)">
-                        Acheter
-                    </button>
+                <!-- Pack 1 -->
+                <div class="shop-item">
+                    <div class="item-info">
+                        <h3>Pack Découverte</h3>
+                        <p>100 Crédits</p>
+                    </div>
+                    <button class="item-price btn-buy-product" data-product-id="product_10_eur"
+                        style="border:none; cursor:pointer;">10.00 €</button>
                 </div>
 
-                <!-- Product 2 -->
-                <div class="product-card"
-                    style="border-color: var(--color-bright-blue); box-shadow: 0 0 30px rgba(0,102,255,0.2);">
-                    <div class="popular-tag">POPULAIRE</div>
-                    <div class="product-points">2200 Pts</div>
-                    <div class="product-bonus">+200 Pts offerts</div>
-                    <div class="product-price">20.00 €</div>
-                    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Le choix de la plupart des étudiants.
-                    </p>
-                    <button class="btn-primary" style="justify-content: center; background: var(--color-bright-blue);"
-                        onclick="buyProduct('product_20_eur', 20)">
-                        Acheter
-                    </button>
+                <!-- Pack 2 -->
+                <div class="shop-item">
+                    <div class="item-info">
+                        <h3>Pack BDE</h3>
+                        <p>250 Crédits <span style="color: #4ade80; font-size: 0.8rem;">(Bonus)</span></p>
+                    </div>
+                    <button class="item-price btn-buy-product" data-product-id="product_20_eur"
+                        style="border:none; cursor:pointer;">20.00 €</button>
                 </div>
 
-                <!-- Product 3 -->
-                <div class="product-card">
-                    <div class="product-points">6000 Pts</div>
-                    <div class="product-bonus">+1000 Pts offerts</div>
-                    <div class="product-price">50.00 €</div>
-                    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Pour les vrais rois de la soirée.</p>
-                    <button class="btn-primary" style="justify-content: center;"
-                        onclick="buyProduct('product_50_eur', 50)">
-                        Acheter
-                    </button>
+                <!-- Pack 3 -->
+                <div class="shop-item">
+                    <div class="item-info">
+                        <h3>Pack Légende</h3>
+                        <p>1000 Crédits <span style="color: #4ade80; font-size: 0.8rem;">(Mega Bonus)</span></p>
+                    </div>
+                    <button class="item-price btn-buy-product" data-product-id="product_50_eur"
+                        style="border:none; cursor:pointer;">50.00 €</button>
                 </div>
             </div>
+        </main>
 
-            <div class="glass" style="margin-top: 4rem; padding: 2rem;">
-                <h3>Comment ça marche ? (Intégration Polar.sh)</h3>
-                <p style="color: var(--text-secondary);">
-                    1. Vous cliquez sur "Acheter" -> Redirection vers <strong>Polar Checkout</strong>.<br>
-                    2. Vous payez en CB/Apple Pay.<br>
-                    3. L'argent part directement au BDE.<br>
-                    4. Polar nous prévient, et vous recevez vos points instantanément.
-                </p>
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav glass-nav">
+            <a href="/shop.html" class="nav-item active">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                <span>Shop</span>
+            </a>
+            <a href="/events.html" class="nav-item">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>Events</span>
+            </a>
+            <a href="/" class="nav-item">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                <span>Carte</span>
+            </a>
+            <a href="/profile.html" class="nav-item">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>Profil</span>
+            </a>
+        </nav>
+    </div>
 
-                <!-- DEV TOOL : Simulate Webhook -->
-                <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
-                    <p style="color: #fbbf24; font-size: 0.9rem; margin-bottom: 1rem;">⚠️ Zone Développeur : Simuler un
-                        paiement réussi (local)</p>
-                    <input type="email" id="simEmail" placeholder="Votre email étudiant"
-                        style="padding: 0.5rem; border-radius: 4px; border: 1px solid var(--glass-border); width: 250px;">
-                    <select id="simProduct" style="padding: 0.5rem; border-radius: 4px;">
-                        <option value="product_10_eur">10€ (1000 pts)</option>
-                        <option value="product_20_eur">20€ (2200 pts)</option>
-                    </select>
-                    <button class="btn-secondary" onclick="simulateWebhook()">Simuler Webhook Polar</button>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <div id="toastContainer" class="toast-container"></div>
-
-    <script src="js/auth.js"></script> <!-- Reusing auth logic for utilities -->
-    <script>
-        function checkAuth() {
-            const token = localStorage.getItem('token');
-            if (!token) window.location.href = '/login.html';
-            const user = JSON.parse(localStorage.getItem('user'));
-            document.getElementById('simEmail').value = user ? user.email : '';
-        }
-
-        function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login.html';
-        }
-
-        async function buyProduct(productId, price) {
-            // In a real app, we would fetch a checkout URL from backend
-            // const res = await fetch('/api/payment/checkout', { ... });
-            // window.location.href = res.checkoutUrl;
-
-            alert(`Redirection vers Polar Checkout pour le produit ${productId} (${price}€)... (Simulation)`);
-        }
-
-        async function simulateWebhook() {
-            const email = document.getElementById('simEmail').value;
-            const productId = document.getElementById('simProduct').value;
-
-            try {
-                const res = await fetch('/api/webhooks/polar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: 'order.paid',
-                        data: {
-                            customer_email: email,
-                            product_id: productId
-                        }
-                    })
-                });
-
-                if (res.ok) {
-                    showToast('Webhook reçu ! Points crédités.', 'success');
-                } else {
-                    showToast('Erreur webhook', 'error');
-                }
-            } catch (error) {
-                console.error(error);
-                showToast('Erreur connexion', 'error');
-            }
-        }
-
-        checkAuth();
-    </script>
+    <script src="/js/app.js"></script>
 </body>
 
 </html>

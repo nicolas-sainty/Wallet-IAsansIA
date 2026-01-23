@@ -27,6 +27,13 @@ class GroupService {
                 JSON.stringify(settings),
             ]);
 
+            // Create BDE Wallet (EUR)
+            await db.query(
+                `INSERT INTO wallets (wallet_id, user_id, group_id, currency, balance, status)
+                 VALUES ($1, $2, $3, 'EUR', 0.00000000, 'active')`,
+                [uuidv4(), adminUserId, groupId]
+            );
+
             logger.info('Group created', { groupId, groupName, adminUserId });
 
             return result.rows[0];

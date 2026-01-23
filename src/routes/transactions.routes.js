@@ -136,4 +136,32 @@ router.post(
     }
 );
 
+router.post(
+    '/pay',
+    [
+        body('userId').isUUID().withMessage('User ID required'),
+        body('groupId').isUUID().withMessage('Group (BDE) ID required'),
+        body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be positive'),
+    ],
+    validate,
+    async (req, res) => {
+        try {
+            const { userId, groupId, amount } = req.body;
+            const transaction = await transactionService.transferCredits(userId, groupId, amount);
+
+            res.status(201).json({
+                success: true,
+                data: transaction,
+                message: 'Payment successful',
+            });
+        } catch (error) {
+            logger.error('Payment failed', { error: error.message });
+            res.status(400).json({
+                success: false,
+                error: error.message,
+            });
+        }
+    }
+);
+
 module.exports = router;

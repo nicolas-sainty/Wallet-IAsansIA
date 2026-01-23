@@ -48,6 +48,7 @@ const api = {
 
 function showToast(message, type = 'info') {
     const container = document.getElementById('toastContainer');
+    if (!container) return; // Guard clause
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = `
@@ -89,382 +90,17 @@ function truncateId(id) {
     return `${id.substring(0, 8)}...${id.substring(id.length - 6)}`;
 }
 
-// ========================================
-// Dashboard Stats
-// ========================================
-
-async function updateDashboardStats() {
-    try {
-        const groupsData = await api.get('/api/groups');
-        const groups = groupsData.data || [];
-
-        let totalWallets = 0;
-        let totalTransactions = 0;
-        let totalVolume = 0;
-
-        for (const group of groups) {
-            const stats = await api.get(`/api/groups/${group.group_id}/stats`);
-            if (stats.data) {
-                totalWallets += parseInt(stats.data.total_wallets) || 0;
-                totalTransactions += parseInt(stats.data.total_transactions) || 0;
-                totalVolume += parseFloat(stats.data.total_volume) || 0;
-            }
-        }
-
-        document.getElementById('totalWallets').textContent = totalWallets;
-        document.getElementById('totalGroups').textContent = groups.length;
-        document.getElementById('totalEvents').textContent = state.events.length;
-    } catch (error) {
-        console.error('Error updating stats:', error);
-    }
-}
-
-// ========================================
-// Event Management
-// ========================================
-
-async function createEvent() {
-    const groupsData = await api.get('/api/groups');
-    const groups = groupsData.data || [];
-
-    if (groups.length === 0) {
-        showToast('Créez d\'abord un groupe (Asso/BDE) !', 'error');
-        return;
-    }
-
-    const title = prompt('Titre de l\'événement :');
-    if (!title) return;
-
-    const rewardPoints = prompt('Points de récompense :', '50');
-    if (!rewardPoints) return;
-
-    // Use first group as organizer for simplicity in this demo
-    const groupId = groups[0].group_id;
-
-    try {
-        await api.post('/api/events', {
-            groupId,
-            title,
-            description: 'Un super événement campus !',
-            eventDate: new Date().toISOString(),
-            rewardPoints: parseFloat(rewardPoints)
-        });
-
-        showToast('Événement créé avec succès !', 'success');
-        await loadEvents();
-        updateDashboardStats();
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-async function loadEvents() {
-    try {
-        const result = await api.get('/api/events');
-        state.events = result.data || [];
-        renderEvents();
-    } catch (error) {
-        console.error('Error loading events:', error);
-    }
-}
-
-function renderEvents() {
-    const container = document.getElementById('eventsGrid');
-
-    if (state.events.length === 0) {
-        container.innerHTML = `
-            <div class="glass" style="padding: 2rem; text-align: center; grid-column: 1 / -1;">
-                <p style="color: var(--text-secondary);">Aucun événement à venir</p>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = state.events.map(event => `
-        <div class="event-card">
-            <div class="event-image">
-                <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-            </div>
-            <div class="event-content">
-                <div class="event-date">${formatDate(event.event_date)}</div>
-                <h3 class="event-title">${event.title}</h3>
-                <p class="event-description">${event.description || 'Pas de description'}</p>
-                <div class="event-footer">
-                    <span class="event-reward">+${event.reward_points} pts</span>
-                    <button class="btn-primary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" 
-                            onclick="participateInEvent('${event.event_id}')">
-                        Participer
-                    </button>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-async function participateInEvent(eventId) {
-    if (state.wallets.length === 0) {
-        showToast('Créez d\'abord un wallet étudiant !', 'error');
-        return;
-    }
-
-    // Pick first wallet as participant for demo
-    const walletId = state.wallets[0].wallet_id;
-
-    try {
-        await api.post(`/api/events/${eventId}/participate`, { walletId });
-        showToast('Participation enregistrée ! Points crédités.', 'success');
-        await loadWallets(); // Update balance
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-// ========================================
-// Wallet Management
-// ========================================
-
-async function createWallet(e) {
-    if (e) e.preventDefault();
-    if (!checkAuth()) {
-        window.location.href = '/login.html?tab=register';
-        return;
-    }
-
-    const groupsData = await api.get('/api/groups');
-    const groups = groupsData.data || [];
-
-    if (groups.length === 0) {
-        showToast('Aucune association trouvée. Créez-en une d\'abord !', 'error');
-        return;
-    }
-
-    const groupId = groups[0].group_id;
-
-    try {
-        await api.post('/api/wallets', {
-            groupId,
-            currency: 'PTS',
-        });
-
-        showToast('Compte étudiant créé !', 'success');
-        await loadWallets();
-        updateDashboardStats();
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-async function loadWallets() {
-    try {
-        const groupsData = await api.get('/api/groups');
-        const groups = groupsData.data || [];
-
-        state.wallets = [];
-
-        for (const group of groups) {
-            const members = await api.get(`/api/groups/${group.group_id}/members`);
-            if (members.data) {
-                state.wallets.push(...members.data.map(w => ({ ...w, group_name: group.group_name })));
-            }
-        }
-
-        renderWallets();
-        // updateWalletSelect(); // If we keep transfers
-    } catch (error) {
-        console.error('Error loading wallets:', error);
-    }
-}
-
-function renderWallets() {
-    const container = document.getElementById('walletsList');
-
-    if (state.wallets.length === 0) {
-        container.innerHTML = `
-      <div class="glass" style="padding: 3rem; text-align: center;">
-        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Pas encore de compte ?</p>
-        <button class="btn-primary" onclick="createWallet()">Créer mon compte</button>
-      </div>
-    `;
-        return;
-    }
-
-    container.innerHTML = state.wallets.map(wallet => `
-    <div class="wallet-card glass">
-      <div class="wallet-header">
-        <div>
-          <small style="color: var(--text-muted);">${wallet.group_name || 'N/A'}</small>
-          <p class="wallet-id">${truncateId(wallet.wallet_id)}</p>
-        </div>
-        <span class="transaction-status success">Actif</span>
-      </div>
-      <div class="wallet-balance">${formatAmount(wallet.balance)} pts</div>
-      <div class="wallet-actions">
-        <button class="btn-secondary" onclick="viewWalletDetails('${wallet.wallet_id}')">Détails</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-async function viewWalletDetails(walletId) {
-    try {
-        const result = await api.get(`/api/wallets/${walletId}`);
-        const wallet = result.data;
-        const balance = await api.get(`/api/wallets/${walletId}/balance`);
-
-        // Simple alert for now
-        alert(`Solde actuel : ${formatAmount(balance.data.confirmedBalance)} points`);
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-// ========================================
-// Group Management
-// ========================================
-
-async function createGroup() {
-    const groupName = prompt('Nom de l\'asso / BDE :');
-    if (!groupName) return;
-
-    try {
-        const adminUserId = crypto.randomUUID();
-
-        await api.post('/api/groups', {
-            groupName,
-            adminUserId,
-            settings: {},
-        });
-
-        showToast('Association créée !', 'success');
-        await loadGroups();
-        updateDashboardStats();
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
-}
-
-async function loadGroups() {
-    try {
-        const result = await api.get('/api/groups');
-        state.groups = result.data || [];
-        renderGroups();
-    } catch (error) {
-        console.error('Error loading groups:', error);
-    }
-}
-
-async function renderGroups() {
-    const container = document.getElementById('groupsList');
-
-    if (state.groups.length === 0) {
-        container.innerHTML = `
-      <div class="glass" style="padding: 3rem; text-align: center; grid-column: 1 / -1;">
-        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Aucune asso enregistrée</p>
-        <button class="btn-primary" onclick="createGroup()">Enregistrer une asso</button>
-      </div>
-    `;
-        return;
-    }
-
-    const groupsHtml = await Promise.all(state.groups.map(async (group) => {
-        let stats = { total_wallets: 0, total_volume: 0 };
-        try {
-            const statsResult = await api.get(`/api/groups/${group.group_id}/stats`);
-            stats = statsResult.data || stats;
-        } catch (error) {
-            console.error('Error loading group data:', error);
-        }
-
-        return `
-      <div class="group-card glass">
-        <div class="group-header">
-          <h3 class="group-name">${group.group_name}</h3>
-        </div>
-        <div class="group-stats">
-          <div class="group-stat">
-            <span class="group-stat-label">Adhérents</span>
-            <span class="group-stat-value">${stats.total_wallets || 0}</span>
-          </div>
-          <div class="group-stat">
-            <span class="group-stat-label">Points Distribués</span>
-            <span class="group-stat-value">${formatAmount(stats.total_volume || 0)}</span>
-          </div>
-        </div>
-      </div>
-    `;
-    }));
-
-    container.innerHTML = groupsHtml.join('');
-}
-
-
-// ========================================
-// Transaction Management (Simplified)
-// ========================================
-
-async function loadTransactions() {
-    try {
-        state.transactions = [];
-        for (const wallet of state.wallets) {
-            const result = await api.get(`/api/wallets/${wallet.wallet_id}/transactions`);
-            if (result.data) {
-                state.transactions.push(...result.data);
-            }
-        }
-        state.transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        renderTransactions();
-    } catch (error) {
-        console.error('Error loading transactions:', error);
-    }
-}
-
-function renderTransactions() {
-    const container = document.getElementById('transactionsList');
-
-    if (state.transactions.length === 0) {
-        container.innerHTML = `
-      <div class="glass" style="padding: 2rem; text-align: center;">
-        <p style="color: var(--text-secondary);">Aucune activité récente</p>
-      </div>
-    `;
-        return;
-    }
-
-    container.innerHTML = state.transactions.map(tx => `
-      <div class="transaction-card glass">
-        <div class="transaction-icon incoming">
-          <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <div class="transaction-info">
-          <p class="transaction-description">Gain de points</p>
-          <p class="transaction-meta">${formatDate(tx.created_at)}</p>
-        </div>
-        <div style="text-align: right;">
-          <p class="transaction-amount incoming">+${formatAmount(tx.amount)} pts</p>
-        </div>
-      </div>
-    `).join('');
-}
-
-// ========================================
-// Initialization
-// ========================================
-
-// ========================================
-// Authentication Logic
-// ========================================
-
 function checkAuth() {
     const token = localStorage.getItem('token');
     return !!token;
 }
 
+function isAuthenticated() { return checkAuth(); }
+
 function updateNavAuth() {
     const navActions = document.querySelector('.nav-actions');
+    if (!navActions) return; // May not exist in mobile layout
+
     const isLoggedIn = checkAuth();
 
     if (isLoggedIn) {
@@ -481,77 +117,363 @@ function updateNavAuth() {
 }
 
 // ========================================
+// Card Page Logic (Mobile Home)
+// ========================================
+
+async function loadCardData() {
+    try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const nameEl = document.getElementById('userName');
+        const roleEl = document.getElementById('userRoleBadge');
+        if (nameEl) nameEl.textContent = user.email;
+        if (roleEl) roleEl.textContent = user.role === 'student' ? 'ETUDIANT' : 'BDE / ADMIN';
+
+        // Fetch User Wallet (CREDITS)
+        // Use existing /api/wallets endpoint with userId query
+        const result = await api.get(`/api/wallets?userId=${user.userId || user.user_id}`);
+        const wallets = result.data || [];
+
+        // Find CREDITS wallet (or first available if none specific)
+        const creditWallet = wallets.find(w => w.currency === 'CREDITS') || wallets[0];
+
+        const balanceEl = document.getElementById('balanceDisplay');
+        if (balanceEl) {
+            if (creditWallet) {
+                balanceEl.textContent = parseFloat(creditWallet.balance).toFixed(2);
+            } else {
+                balanceEl.textContent = "0.00";
+            }
+        }
+
+        // Store in state
+        state.wallets = wallets;
+
+        // Load History (Placeholder or real)
+        const activityList = document.getElementById('recentTransactionsList');
+        if (activityList && creditWallet) {
+            const txResult = await api.get(`/api/wallets/${creditWallet.wallet_id}/transactions`);
+            const txs = txResult.data || [];
+            if (txs.length === 0) {
+                activityList.innerHTML = '<p class="empty-text">Aucune transaction.</p>';
+            } else {
+                activityList.innerHTML = txs.slice(0, 5).map(tx => `
+                    <div style="display:flex; justify-content:space-between; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <div>
+                            <span style="font-size:0.9rem;">${tx.description || 'Transaction'}</span><br>
+                            <small style="color:var(--text-muted);">${formatDate(tx.created_at)}</small>
+                        </div>
+                        <span style="color:${tx.amount > 0 ? '#4ade80' : '#ef4444'};">
+                            ${tx.amount > 0 ? '+' : ''}${formatAmount(tx.amount)}
+                        </span>
+                    </div>
+                 `).join('');
+            }
+        }
+
+    } catch (error) {
+        console.error("Error loading card data", error);
+        showToast("Erreur chargement carte", "error");
+    }
+}
+
+async function loadGroupsForPay() {
+    try {
+        const result = await api.get('/api/groups');
+        const groups = result.data || [];
+        const select = document.getElementById('payRecipientGroup');
+        if (!select) return;
+
+        select.innerHTML = '<option value="" disabled selected>Choisir un BDE...</option>' +
+            groups.map(g => `<option value="${g.group_id}">${g.group_name}</option>`).join('');
+    } catch (e) {
+        console.error("Error loading groups", e);
+    }
+}
+
+function openPayModal() {
+    const el = document.getElementById('payModal');
+    if (el) el.classList.remove('hidden');
+}
+
+function closePayModal() {
+    const el = document.getElementById('payModal');
+    if (el) el.classList.add('hidden');
+}
+
+async function processPayment() {
+    const amountEl = document.getElementById('payAmount');
+    const groupEl = document.getElementById('payRecipientGroup');
+    const user = JSON.parse(localStorage.getItem('user'));
+
+    if (!amountEl || !groupEl) return;
+
+    const amount = parseFloat(amountEl.value);
+    const groupId = groupEl.value;
+
+    if (!amount || amount <= 0) {
+        showToast('Montant invalide', 'error');
+        return;
+    }
+    if (!groupId) {
+        showToast('Veuillez choisir un bénéficiaire', 'error');
+        return;
+    }
+
+    try {
+        await api.post('/api/transactions/pay', {
+            userId: user.userId || user.user_id, // Check how userId is stored
+            groupId: groupId,
+            amount: amount
+        });
+
+        showToast('Paiement envoyé !', 'success');
+        closePayModal();
+        await loadCardData(); // Refresh balance
+    } catch (error) {
+        showToast(error.message || 'Erreur paiement', 'error');
+    }
+}
+
+// ========================================
+// Event Logic (Retained & Adapted)
+// ========================================
+
+async function loadEvents() {
+    try {
+        const result = await api.get('/api/events');
+        state.events = result.data || [];
+        renderEvents();
+    } catch (error) {
+        console.error('Error loading events:', error);
+    }
+}
+
+function renderEvents() {
+    const container = document.getElementById('eventsGrid');
+    if (!container) return; // Might not exist on other pages
+
+    if (state.events.length === 0) {
+        container.innerHTML = `
+            <div class="glass" style="padding: 2rem; text-align: center; grid-column: 1 / -1;">
+                <p style="color: var(--text-secondary);">Aucun événement à venir</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Check user role
+    const user = JSON.parse(localStorage.getItem('user'));
+    const isBDE = user && (user.role === 'bde_admin' || user.role === 'admin');
+
+    container.innerHTML = state.events.map(event => {
+        let actionArea = '';
+
+        if (isBDE) {
+            actionArea = `
+                <div class="admin-actions" style="margin-top: 1rem; border-top: 1px solid var(--glass-border); padding-top: 1rem;">
+                    <p style="font-weight: 600; margin-bottom: 0.5rem; color: #fbbf24;">Zone BDE</p>
+                    <button class="btn-secondary" style="width: 100%;" onclick="loadEventParticipants('${event.event_id}')">
+                        Gérer les participations
+                    </button>
+                    <div id="participants-${event.event_id}" style="margin-top: 0.5rem;"></div>
+                </div>
+            `;
+        } else {
+            actionArea = `
+                <button class="btn-primary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" 
+                        onclick="participateInEvent('${event.event_id}')">
+                    Participer
+                </button>
+            `;
+        }
+
+        return `
+        <div class="event-card">
+            <div class="event-image">
+                <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <div class="event-content">
+                <div class="event-date">${formatDate(event.event_date)}</div>
+                <h3 class="event-title">${event.title}</h3>
+                <p class="event-description">${event.description || 'Pas de description'}</p>
+                <div class="event-footer">
+                    <span class="event-reward">+${event.reward_points} pts</span>
+                    ${actionArea}
+                </div>
+            </div>
+        </div>
+    `}).join('');
+}
+
+async function participateInEvent(eventId) {
+    if (state.wallets.length === 0 && !state.walletsLoaded) {
+        // Try load wallets first if not loaded
+        // But for participate, we generally need walletId.
+        // Let's assume user has wallet if logged in (auto-created)
+        // Fetch them now if empty
+        const user = JSON.parse(localStorage.getItem('user'));
+        const result = await api.get(`/api/wallets?userId=${user.userId || user.user_id}`);
+        state.wallets = result.data || [];
+    }
+
+    if (state.wallets.length === 0) {
+        showToast('Créez d\'abord un wallet étudiant !', 'error');
+        return;
+    }
+
+    const walletId = state.wallets[0].wallet_id;
+
+    try {
+        await api.post(`/api/events/${eventId}/participate`, { walletId });
+        showToast('Participation enregistrée !', 'info');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function loadEventParticipants(eventId) {
+    const container = document.getElementById(`participants-${eventId}`);
+    if (!container) return;
+
+    container.innerHTML = '<small>Chargement...</small>';
+
+    try {
+        const result = await api.get('/api/events/pending');
+        const allPending = result.data || [];
+        const eventPending = allPending.filter(p => p.event_id === eventId);
+
+        if (eventPending.length === 0) {
+            container.innerHTML = '<small style="color: var(--text-muted);">Aucune demande en attente.</small>';
+            return;
+        }
+
+        container.innerHTML = eventPending.map(p => `
+            <div style="background: rgba(0,0,0,0.2); padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span style="font-weight: 600; font-size: 0.9rem;">${p.user_name}</span>
+                </div>
+                <div style="display: flex; gap: 0.2rem;">
+                    <button style="background: #10b981; border: none; border-radius: 4px; cursor: pointer; padding: 2px 6px;" onclick="validateParticipation('${p.participant_id}', 'verified')">✔</button>
+                    <button style="background: #ef4444; border: none; border-radius: 4px; cursor: pointer; padding: 2px 6px;" onclick="validateParticipation('${p.participant_id}', 'rejected')">✖</button>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        container.innerHTML = '<small style="color: red;">Erreur</small>';
+    }
+}
+
+async function validateParticipation(participantId, status) {
+    try {
+        await api.post(`/api/events/participants/${participantId}/validate`, { status });
+        showToast(status === 'verified' ? 'Validé !' : 'Rejeté', 'success');
+        // Refresh the specific list? Hard to access parent ID here easily without DOM trav.
+        showToast('Refresh manuel requis pour voir les changements (Demo)', 'info');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function buyProduct(productId) {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || !user.email) {
+        showToast('Erreur utilisateur. Reconnectez-vous.', 'error');
+        return;
+    }
+
+    if (!confirm("Simuler l'achat (Mode Démo) ?")) return;
+
+    try {
+        await api.post('/api/payment/simulate', {
+            productId,
+            email: user.email
+        });
+        showToast('Achat simule avec succès ! +Credits', 'success');
+
+        // If we are on the dashboard/card view (which splits shop/home in single page app sometimes)
+        // But here shop is separate HTML. 
+        // We can just log. Next load of card will fetch fresh data.
+        console.log("Purchase simulated. Balance should update on next fetch.");
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function createEvent() {
+    // Simplified creation for BDE
+    const title = prompt('Titre de l\'événement :');
+    if (!title) return;
+    const points = prompt('Points :', '50');
+
+    // Need group ID. For demo, fetch groups and pick first.
+    try {
+        const grpRes = await api.get('/api/groups');
+        if (!grpRes.data || grpRes.data.length === 0) {
+            alert("Aucun groupe BDE trouvé."); return;
+        }
+        await api.post('/api/events', {
+            groupId: grpRes.data[0].group_id,
+            title,
+            description: 'Event Mobile',
+            eventDate: new Date().toISOString(),
+            rewardPoints: parseFloat(points)
+        });
+        showToast("Event créé", "success");
+        await loadEvents();
+    } catch (e) { showToast(e.message, 'error'); }
+}
+
+
+// ========================================
 // Initialization
 // ========================================
 
 async function init() {
-    console.log('🚀 Initializing Student Wallet...');
+    console.log('🚀 Initializing Student Wallet (Mobile)...');
 
     updateNavAuth();
 
-    const themeToggle = document.getElementById('themeToggle');
-    if (themeToggle) {
-        themeToggle.addEventListener('click', () => {
-            document.body.classList.toggle('light-theme');
+    // Make globally available
+    window.validateParticipation = validateParticipation;
+    window.loadEventParticipants = loadEventParticipants;
+    window.openPayModal = openPayModal;
+    window.closePayModal = closePayModal;
+    window.processPayment = processPayment;
+    window.buyProduct = buyProduct;
+
+    const path = window.location.pathname;
+
+    if (path === '/' || path === '/index.html') {
+        if (isAuthenticated()) {
+            await loadCardData();
+            await loadGroupsForPay();
+        } else {
+            // Redirect to Login if not auth
+            window.location.href = '/login.html';
+        }
+    } else if (path.includes('events.html')) {
+        await loadEvents();
+        // Load event listeners for create modal if exists
+        const createEventBtn = document.getElementById('createEventBtn');
+        if (createEventBtn) createEventBtn.addEventListener('click', createEvent);
+    } else if (path.includes('shop.html')) {
+        // Shop logic - Attach event listeners to buttons
+        document.querySelectorAll('.btn-buy-product').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const productId = e.target.getAttribute('data-product-id');
+                // Or e.currentTarget if the click might be on a child
+                if (productId) {
+                    buyProduct(productId);
+                }
+            });
         });
-    }
-
-    // Navigation - Highlight active link based on URL if not already hardcoded
-    const currentPath = window.location.pathname;
-    document.querySelectorAll('.nav-link').forEach(link => {
-        if (link.getAttribute('href') === currentPath) {
-            link.classList.add('active');
-        }
-    });
-
-    // Event listeners
-    const createWalletBtn = document.getElementById('createWalletBtn');
-    if (createWalletBtn) createWalletBtn.addEventListener('click', createWallet);
-
-    const addWalletBtn = document.getElementById('addWalletBtn');
-    if (addWalletBtn) addWalletBtn.addEventListener('click', createWallet);
-
-    const createGroupBtn = document.getElementById('createGroupBtn');
-    if (createGroupBtn) createGroupBtn.addEventListener('click', createGroup);
-
-    const createEventBtn = document.getElementById('createEventBtn');
-    if (createEventBtn) createEventBtn.addEventListener('click', createEvent);
-
-    // Initial Data Loading based on page presence
-    try {
-        // Always load stats for the dashboard if elements exist
-        if (document.getElementById('totalWallets')) {
-            await updateDashboardStats();
-        }
-
-        // Load specific sections if they exist in the DOM
-        if (document.getElementById('groupsList')) {
-            await loadGroups();
-        }
-
-        if (document.getElementById('walletsList')) {
-            await loadWallets();
-        }
-
-        if (document.getElementById('eventsGrid')) {
-            await loadEvents();
-        }
-
-        if (document.getElementById('transactionsList')) {
-            await loadTransactions();
-        }
-
-        // If checks pass, show ready toast
-        // showToast('Student Wallet prêt !', 'success'); 
-    } catch (error) {
-        console.error('Initialization error:', error);
-        showToast('Erreur de connexion au serveur.', 'error');
+    } else if (path.includes('profile.html')) {
+        // Load profile data if needed
     }
 }
 
-// Start app when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
-}
+// Start
+document.addEventListener('DOMContentLoaded', init);

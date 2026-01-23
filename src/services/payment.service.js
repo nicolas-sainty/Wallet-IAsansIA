@@ -1,34 +1,12 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 const logger = require('../config/logger');
 const { v4: uuidv4 } = require('uuid');
+const db = require('../config/database');
 
-const dbPath = path.join(__dirname, '../../database/epicoin.sqlite');
-const db = new sqlite3.Database(dbPath);
-
-// Mock Product Mapping: Polar Product ID -> Points Amount
+// Mock Product Mapping: Polar Product ID -> Credits Amount
 const PRODUCT_MAPPING = {
-    'product_10_eur': 1000,
-    'product_20_eur': 2200, // Bonus info
-    'product_50_eur': 6000
-};
-
-const runQuery = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.run(query, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-};
-
-const getQuery = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.get(query, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
+    'product_10_eur': 100,    // 10 EUR = 100 Credits
+    'product_20_eur': 250,    // 20 EUR = 250 Credits (Bonus)
+    'product_50_eur': 1000    // 50 EUR = 1000 Credits (Big Bonus)
 };
 
 class PaymentService {
@@ -54,51 +32,94 @@ class PaymentService {
             throw new Error('No email found in payload');
         }
 
-        const pointsToAdd = PRODUCT_MAPPING[productId] || 0;
+        const creditsToAdd = PRODUCT_MAPPING[productId] || 0;
 
-        if (pointsToAdd === 0) {
+        if (creditsToAdd === 0) {
             logger.warn(`Unknown product ID: ${productId}`);
             return;
         }
 
-        logger.info(`Processing payment for ${userEmail}: +${pointsToAdd} pts`);
+        logger.info(`Processing payment for ${userEmail}: +${creditsToAdd} credits`);
 
-        await this.creditUser(userEmail, pointsToAdd);
+        await this.creditUser(userEmail, creditsToAdd);
     }
 
     async creditUser(email, points) {
         // Find user by email
-        const user = await getQuery('SELECT user_id FROM users WHERE email = ?', [email]);
+        const { rows: users } = await db.query('SELECT user_id FROM users WHERE email = $1', [email]);
+        const user = users[0];
 
         if (!user) {
-            logger.warn(`User not found for payment: ${email}. Pending logic could be added here.`);
+            logger.warn(`User not found for payment: ${email}.`);
             return;
         }
 
-        // Find user's wallet (assuming 1 wallet for simplicity or specific logic)
-        // We pick the first active wallet for now, or the one linked to the main BDE
-        const wallet = await getQuery('SELECT wallet_id FROM wallets WHERE user_id = ? LIMIT 1', [user.user_id]);
+        // Find user's wallet (CREDITS)
+        const { rows: wallets } = await db.query(
+            "SELECT wallet_id FROM wallets WHERE user_id = $1 AND currency = 'CREDITS' LIMIT 1",
+            [user.user_id]
+        );
+        let wallet = wallets[0];
 
         if (!wallet) {
-            // Create a wallet if none exists ? Or throw error
+            // Check for legacy PTS/EPIC wallet fallback if migration missed some
+            const { rows: legacy } = await db.query(
+                "SELECT wallet_id FROM wallets WHERE user_id = $1 AND currency IN ('PTS', 'EPIC') LIMIT 1",
+                [user.user_id]
+            );
+            wallet = legacy[0];
+        }
+
+        if (!wallet) {
             logger.error(`No wallet found for user ${user.user_id}`);
             return;
         }
 
-        // Update balance
-        await runQuery(
-            'UPDATE wallets SET balance = balance + ? WHERE wallet_id = ?',
-            [points, wallet.wallet_id]
-        );
+        // Calculate Revenue in EUR (Product Price from details)
+        const REVENUE_MAPPING = {
+            100: 10,  // 10 EUR
+            250: 20,  // 20 EUR
+            1000: 50  // 50 EUR
+        };
+        const revenueEur = REVENUE_MAPPING[points] || 0;
 
-        // Record Transaction (Deposit)
-        await runQuery(
-            `INSERT INTO transactions (transaction_id, wallet_id, amount, type, status, description, created_at)
-             VALUES (?, ?, ?, 'deposit', 'completed', 'Rechargement Polar', datetime('now'))`,
-            [uuidv4(), wallet.wallet_id, points]
-        );
+        await db.transaction(async (client) => {
+            // 1. Credit Student (CREDITS)
+            await client.query(
+                "UPDATE wallets SET balance = balance + $1 WHERE wallet_id = $2",
+                [points, wallet.wallet_id]
+            );
 
-        logger.info(`Successfully credited ${points} pts to wallet ${wallet.wallet_id}`);
+            // 2. Credit BDE (EUR)
+            const { rows: bdeWallets } = await client.query("SELECT wallet_id FROM wallets WHERE currency = 'EUR' LIMIT 1");
+
+            if (bdeWallets.length > 0) {
+                const bdeWalletId = bdeWallets[0].wallet_id;
+                await client.query(
+                    "UPDATE wallets SET balance = balance + $1 WHERE wallet_id = $2",
+                    [revenueEur, bdeWalletId]
+                );
+
+                // Record BDE Transaction (Revenue)
+                await client.query(
+                    `INSERT INTO transactions (transaction_id, destination_wallet_id, amount, currency, transaction_type, direction, status, description, created_at)
+                     VALUES ($1, $2, $3, 'EUR', 'PURCHASE', 'incoming', 'SUCCESS', 'Vente Pack Credits', NOW())`,
+                    [uuidv4(), bdeWalletId, revenueEur]
+                );
+                logger.info(`Credited BDE Wallet ${bdeWalletId}: +${revenueEur} EUR`);
+            } else {
+                logger.warn("No BDE (EUR) Wallet found to credit revenue.");
+            }
+
+            // 3. Record Student Transaction (Credit Load)
+            await client.query(
+                `INSERT INTO transactions (transaction_id, destination_wallet_id, amount, currency, transaction_type, direction, status, description, created_at)
+                 VALUES ($1, $2, $3, 'CREDITS', 'CASHIN', 'incoming', 'SUCCESS', 'Achat Credits', NOW())`,
+                [uuidv4(), wallet.wallet_id, points]
+            );
+        });
+
+        logger.info(`Successfully processed payment: Student +${points} CREDITS, BDE +${revenueEur} EUR`);
     }
 }
 

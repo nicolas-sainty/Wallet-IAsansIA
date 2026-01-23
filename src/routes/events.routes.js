@@ -96,4 +96,51 @@ router.post(
     }
 );
 
+/**
+ * GET /api/events/pending
+ * Get all pending participations (BDE Admin only usually)
+ */
+router.get('/pending', async (req, res) => {
+    try {
+        // In real app, verify user is BDE Admin
+        const participations = await eventService.getPendingParticipations();
+        res.json({
+            success: true,
+            data: participations
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/events/participants/:participantId/validate
+ * Validate or Reject a participation
+ */
+router.post(
+    '/participants/:participantId/validate',
+    [
+        body('status').isIn(['verified', 'rejected'])
+    ],
+    validate,
+    async (req, res) => {
+        try {
+            const { participantId } = req.params;
+            const { status } = req.body;
+
+            const result = await eventService.validateParticipation(participantId, status);
+
+            res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            res.status(400).json({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+);
+
 module.exports = router;

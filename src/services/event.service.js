@@ -1,38 +1,6 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
-
-const dbPath = path.join(__dirname, '../../database/epicoin.sqlite');
-const db = new sqlite3.Database(dbPath);
-
-// Promisify DB helper (Should abstract this later if time permits)
-const runQuery = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.run(query, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-};
-
-const getQuery = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.get(query, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
-};
-
-const allQuery = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.all(query, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
-        });
-    });
-};
+const db = require('../config/database');
 
 /**
  * Event Service
@@ -46,9 +14,9 @@ class EventService {
         const eventId = uuidv4();
 
         try {
-            await runQuery(
+            await db.query(
                 `INSERT INTO events (event_id, group_id, title, description, event_date, reward_points) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
                 [eventId, groupId, title, description, eventDate, rewardPoints]
             );
 
@@ -65,13 +33,14 @@ class EventService {
      */
     async getUpcomingEvents() {
         try {
-            return await allQuery(
+            const { rows } = await db.query(
                 `SELECT e.*, g.group_name 
                  FROM events e 
                  JOIN groups g ON e.group_id = g.group_id
                  WHERE e.status = 'upcoming' OR e.status = 'active'
                  ORDER BY e.event_date ASC`
             );
+            return rows;
         } catch (error) {
             logger.error('Error fetching events:', error);
             throw error;
@@ -82,7 +51,8 @@ class EventService {
      * Get event details
      */
     async getEvent(eventId) {
-        return await getQuery('SELECT * FROM events WHERE event_id = ?', [eventId]);
+        const { rows } = await db.query('SELECT * FROM events WHERE event_id = $1', [eventId]);
+        return rows[0];
     }
 
     /**
@@ -94,39 +64,95 @@ class EventService {
         if (!event) throw new Error('Event not found');
 
         // Check if already participated
-        const existing = await getQuery(
-            'SELECT * FROM event_participants WHERE event_id = ? AND wallet_id = ?',
+        const { rows } = await db.query(
+            'SELECT * FROM event_participants WHERE event_id = $1 AND wallet_id = $2',
             [eventId, walletId]
         );
 
-        if (existing) {
+        if (rows.length > 0) {
             throw new Error('Wallet has already participated in this event');
         }
 
         const participantId = uuidv4();
 
-        // Transaction to ensure atomicity (SQLite serialized mode handles this mostly, but good practice)
-        // 1. Record participation
-        await runQuery(
-            `INSERT INTO event_participants (participant_id, event_id, wallet_id, points_earned)
-             VALUES (?, ?, ?, ?)`,
-            [participantId, eventId, walletId, event.reward_points]
-        );
+        // Transaction to ensure atomicity
+        return await db.transaction(async (client) => {
+            // 1. Record participation as PENDING
+            const result = await client.query(
+                `INSERT INTO event_participants (participant_id, event_id, wallet_id, points_earned, status)
+                 VALUES ($1, $2, $3, $4, 'pending')
+                 RETURNING *`,
+                [participantId, eventId, walletId, event.reward_points]
+            );
 
-        // 2. Credit wallet (Using raw update for simplicity, ideally call WalletService)
-        // We assume WalletService logic is simple enough here or we inject it. 
-        // For speed, let's update directly but log it.
-        await runQuery(
-            `UPDATE wallets SET balance = balance + ? WHERE wallet_id = ?`,
-            [event.reward_points, walletId]
-        );
+            logger.info(`Participation recorded (PENDING): Event ${eventId}, Wallet ${walletId}, Points ${event.reward_points}`);
 
-        logger.info(`Participation recorded: Event ${eventId}, Wallet ${walletId}, Points ${event.reward_points}`);
+            return result.rows[0];
+        });
+    }
 
-        return {
-            participantId,
-            pointsEarned: event.reward_points
-        };
+    /**
+     * Validate or Reject participation
+     * @param {string} participantId
+     * @param {string} status - 'verified' or 'rejected'
+     */
+    async validateParticipation(participantId, status) {
+        if (!['verified', 'rejected'].includes(status)) {
+            throw new Error('Invalid status. Must be verified or rejected');
+        }
+
+        return await db.transaction(async (client) => {
+            // 1. Get participation details
+            const { rows } = await client.query(
+                'SELECT * FROM event_participants WHERE participant_id = $1',
+                [participantId]
+            );
+            const participation = rows[0];
+
+            if (!participation) throw new Error('Participation not found');
+            if (participation.status !== 'pending') throw new Error('Participation already processed');
+
+            // 2. Update status
+            await client.query(
+                'UPDATE event_participants SET status = $1 WHERE participant_id = $2',
+                [status, participantId]
+            );
+
+            // 3. If verified, credit wallet
+            if (status === 'verified') {
+                await client.query(
+                    'UPDATE wallets SET balance = balance + $1 WHERE wallet_id = $2',
+                    [participation.points_earned, participation.wallet_id]
+                );
+            }
+
+            return { success: true, status };
+        });
+    }
+
+    /**
+     * Get pending participations for a group (or all if groupId is null)
+     */
+    async getPendingParticipations(groupId = null) {
+        let query = `
+            SELECT ep.*, e.title as event_title, u.full_name as user_name, u.email as user_email
+            FROM event_participants ep
+            JOIN events e ON ep.event_id = e.event_id
+            JOIN wallets w ON ep.wallet_id = w.wallet_id
+            JOIN users u ON w.user_id = u.user_id
+            WHERE ep.status = 'pending'
+        `;
+        const params = [];
+
+        if (groupId) {
+            query += ' AND e.group_id = $1';
+            params.push(groupId);
+        }
+
+        query += ' ORDER BY ep.participated_at DESC';
+
+        const { rows } = await db.query(query, params);
+        return rows;
     }
 }
 

@@ -2,7 +2,6 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const logger = require('../config/logger');
 const walletService = require('./wallet.service');
-const groupService = require('./group.service');
 
 class TransactionService {
     /**
@@ -60,7 +59,7 @@ class TransactionService {
         RETURNING *
       `;
 
-            const result = await db.query(query, [
+            const { rows } = await db.query(query, [
                 transactionId,
                 initiatorUserId,
                 sourceWalletId,
@@ -89,7 +88,7 @@ class TransactionService {
                 });
             });
 
-            return result.rows[0];
+            return rows[0];
         } catch (error) {
             logger.error('Error initiating transaction', { error: error.message, params });
             throw error;
@@ -194,10 +193,10 @@ class TransactionService {
         WHERE from_group_id = $1 AND to_group_id = $2 AND active = true
       `;
 
-            const rules = await db.query(rulesQuery, [fromGroupId, toGroupId]);
+            const { rows: rules } = await db.query(rulesQuery, [fromGroupId, toGroupId]);
 
-            if (rules.rows.length > 0) {
-                const rule = rules.rows[0];
+            if (rules.length > 0) {
+                const rule = rules[0];
 
                 // Check max transaction amount
                 if (rule.max_transaction_amount && amount > parseFloat(rule.max_transaction_amount)) {
@@ -215,8 +214,8 @@ class TransactionService {
               AND status = 'SUCCESS'
           `;
 
-                    const dailyResult = await db.query(dailyQuery, [fromGroupId, toGroupId]);
-                    const dailyTotal = parseFloat(dailyResult.rows[0].total);
+                    const { rows: dailyResult } = await db.query(dailyQuery, [fromGroupId, toGroupId]);
+                    const dailyTotal = parseFloat(dailyResult[0].total);
 
                     if (dailyTotal + amount > parseFloat(rule.daily_limit)) {
                         throw new Error('Daily transaction limit exceeded');
@@ -230,10 +229,10 @@ class TransactionService {
         WHERE from_group_id = $1 AND to_group_id = $2
       `;
 
-            const trustResult = await db.query(trustQuery, [fromGroupId, toGroupId]);
+            const { rows: trustResult } = await db.query(trustQuery, [fromGroupId, toGroupId]);
 
-            if (trustResult.rows.length > 0) {
-                const trustScore = parseFloat(trustResult.rows[0].trust_score);
+            if (trustResult.length > 0) {
+                const trustScore = parseFloat(trustResult[0].trust_score);
                 const minTrustScore = parseFloat(process.env.MIN_TRUST_SCORE_FOR_TRANSACTION || '20.00');
 
                 if (trustScore < minTrustScore) {
@@ -300,8 +299,7 @@ class TransactionService {
      */
     async getTransaction(transactionId) {
         try {
-            const query = 'SELECT * FROM transactions WHERE transaction_id = $1';
-            const result = await db.query(query, [transactionId]);
+            const result = await db.query('SELECT * FROM transactions WHERE transaction_id = $1', [transactionId]);
 
             if (result.rows.length === 0) {
                 throw new Error('Transaction not found');
@@ -314,11 +312,6 @@ class TransactionService {
         }
     }
 
-    /**
-     * Cancel a pending transaction
-     * @param {string} transactionId - Transaction ID
-     * @returns {Promise<Object>} Canceled transaction
-     */
     async cancelTransaction(transactionId) {
         try {
             const query = `
@@ -339,6 +332,66 @@ class TransactionService {
             return result.rows[0];
         } catch (error) {
             logger.error('Error canceling transaction', { error: error.message, transactionId });
+            throw error;
+        }
+    }
+
+    /**
+     * Transfer credits from User to Group (BDE)
+     * @param {string} userId - Sender User ID
+     * @param {string} groupId - Recipient Group ID
+     * @param {number} amount - Amount in CREDITS
+     */
+    async transferCredits(userId, groupId, amount) {
+        try {
+            // 1. Get Source Wallet (Student - CREDITS)
+            // Assuming 1 active wallet per user for simplicity
+            const { rows: userWallets } = await db.query(
+                "SELECT * FROM wallets WHERE user_id = $1 AND currency = 'CREDITS' AND status = 'active' LIMIT 1",
+                [userId]
+            );
+
+            if (userWallets.length === 0) {
+                // Fallback: Check if they found an old PTS wallet that migrated
+                throw new Error('No active CREDITS wallet found for user');
+            }
+            const sourceWallet = userWallets[0];
+
+            // 2. Get Destination Wallet (Group - CREDITS)
+            let { rows: groupWallets } = await db.query(
+                "SELECT * FROM wallets WHERE group_id = $1 AND currency = 'CREDITS' AND status = 'active' LIMIT 1",
+                [groupId]
+            );
+
+            let destWalletId;
+            if (groupWallets.length === 0) {
+                // Create CREDITS wallet for Group if missing
+                logger.info(`Creating CREDITS wallet for group ${groupId}`);
+                const newWalletId = uuidv4();
+                // We need admin_user_id to create wallet? Schema allows null user_id if group_id is present
+                await db.query(
+                    `INSERT INTO wallets (wallet_id, group_id, currency, balance, status)
+                     VALUES ($1, $2, 'CREDITS', 0.00000000, 'active')`,
+                    [newWalletId, groupId]
+                );
+                destWalletId = newWalletId;
+            } else {
+                destWalletId = groupWallets[0].wallet_id;
+            }
+
+            // 3. Initiate Transaction
+            return await this.initiateTransaction({
+                initiatorUserId: userId,
+                sourceWalletId: sourceWallet.wallet_id,
+                destinationWalletId: destWalletId,
+                amount: amount,
+                currency: 'CREDITS',
+                transactionType: 'PAYMENT',
+                description: 'Paiement BDE'
+            });
+
+        } catch (error) {
+            logger.error('Credit transfer failed', { error: error.message, userId, groupId });
             throw error;
         }
     }
