@@ -22,10 +22,20 @@ class AuthService {
         const verificationToken = uuidv4();
 
         try {
+            // Get default BDE (first active group) if niet specified
+            let bdeId = null;
+            const bdeResult = await db.query(
+                'SELECT group_id FROM groups WHERE status = $1 LIMIT 1',
+                ['active']
+            );
+            if (bdeResult.rows.length > 0) {
+                bdeId = bdeResult.rows[0].group_id;
+            }
+
             await db.query(
-                `INSERT INTO users (user_id, email, password_hash, full_name, role, verification_token) 
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [userId, email, hashedPassword, fullName, role, verificationToken]
+                `INSERT INTO users (user_id, email, password_hash, full_name, role, bde_id, verification_token) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [userId, email, hashedPassword, fullName, role, bdeId, verificationToken]
             );
 
             // Send Verification Email
@@ -38,7 +48,7 @@ class AuthService {
             );
             logger.info(`Wallet created for user: ${userId}`);
 
-            logger.info(`User registered: ${email} (${userId})`);
+            logger.info(`User registered: ${email} (${userId}) with BDE: ${bdeId}`);
 
             return {
                 userId,

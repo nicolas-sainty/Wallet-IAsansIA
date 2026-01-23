@@ -27,6 +27,19 @@
                     STUDENT</div>
             </div>
 
+            <!-- BDE Information -->
+            <div class="glass-panel" style="margin-bottom: 20px;">
+                <h3 style="margin-top: 0;">Mon BDE</h3>
+                <div style="text-align: center; padding: 20px 0;">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">🎓</div>
+                    <p id="profileBdeName"
+                        style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color); margin: 0;">
+                        Chargement...
+                    </p>
+                    <small style="color: var(--text-muted);">Bureau des Étudiants</small>
+                </div>
+            </div>
+
             <!-- Settings / Actions -->
             <div class="glass-panel">
                 <h3 style="margin-top: 0;">Paramètres</h3>
@@ -86,13 +99,27 @@
         // Ideally should be in app.js 'loadProfile' but for simplicity keeping small logic here for init
         // Actually, let's delegate to app.js init logic by just linking it.
         // But app.js logic needs to be triggered.
-        document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener("DOMContentLoaded", async () => {
             const user = JSON.parse(localStorage.getItem('user'));
             if (user) {
                 document.getElementById('profileName').textContent = user.full_name || user.email;
                 document.getElementById('profileEmail').textContent = user.email;
                 document.getElementById('profileInitials').textContent = (user.full_name || user.email).charAt(0).toUpperCase();
                 document.getElementById('profileRole').textContent = user.role === 'student' ? 'ETUDIANT' : 'BDE / ADMIN';
+
+                // Load BDE name
+                if (user.bde_id) {
+                    try {
+                        const response = await fetch(`/api/groups/${user.bde_id}`);
+                        const result = await response.json();
+                        const bdeName = result.data?.group_name || 'Mon BDE';
+                        document.getElementById('profileBdeName').textContent = bdeName;
+                    } catch (e) {
+                        document.getElementById('profileBdeName').textContent = 'BDE';
+                    }
+                } else {
+                    document.getElementById('profileBdeName').textContent = 'Aucun BDE assigné';
+                }
             }
         });
 

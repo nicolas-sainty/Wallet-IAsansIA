@@ -263,28 +263,57 @@ function renderEvents() {
 
     // Check user role
     const user = JSON.parse(localStorage.getItem('user'));
-    const isBDE = user && (user.role === 'bde_admin' || user.role === 'admin');
+    const isAdmin = user && (user.role === 'bde_admin' || user.role === 'admin');
+
+    // Show create button for admins
+    const createBtn = document.getElementById('createEventBtn');
+    if (createBtn && isAdmin) {
+        createBtn.style.display = 'block';
+    }
 
     container.innerHTML = state.events.map(event => {
+        // Status badge
+        const statusColors = {
+            'DRAFT': '#6b7280',
+            'OPEN': '#10b981',
+            'FULL': '#f59e0b',
+            'CLOSED': '#ef4444',
+            'CANCELLED': '#6b7280'
+        };
+        const status = event.status || 'OPEN';
+        const statusBadge = `<span style="background: ${statusColors[status]}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem;">${status}</span>`;
+
+        // Participants count
+        const participantsInfo = event.max_participants
+            ? `<small style="color: var(--text-muted);">${event.current_participants || 0}/${event.max_participants} inscrits</small>`
+            : `<small style="color: var(--text-muted);">${event.current_participants || 0} inscrits</small>`;
+
         let actionArea = '';
 
-        if (isBDE) {
+        if (isAdmin) {
             actionArea = `
-                <div class="admin-actions" style="margin-top: 1rem; border-top: 1px solid var(--glass-border); padding-top: 1rem;">
-                    <p style="font-weight: 600; margin-bottom: 0.5rem; color: #fbbf24;">Zone BDE</p>
-                    <button class="btn-secondary" style="width: 100%;" onclick="loadEventParticipants('${event.event_id}')">
-                        Gérer les participations
-                    </button>
-                    <div id="participants-${event.event_id}" style="margin-top: 0.5rem;"></div>
+                <div style="margin-top: 0.5rem;">
+                    ${participantsInfo}
                 </div>
             `;
         } else {
-            actionArea = `
-                <button class="btn-primary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" 
-                        onclick="participateInEvent('${event.event_id}')">
-                    Participer
-                </button>
-            `;
+            // Student actions based on status
+            if (status === 'OPEN') {
+                actionArea = `
+                    <button class="btn-primary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; width: 100%;" 
+                            onclick="participateInEvent('${event.event_id}')">
+                        S'inscrire
+                    </button>
+                `;
+            } else if (status === 'FULL') {
+                actionArea = `<p style="color: #f59e0b; font-size: 0.8rem; margin-top: 0.5rem;">Complet</p>`;
+            } else if (status === 'CLOSED') {
+                actionArea = `<p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Terminé</p>`;
+            } else if (status === 'CANCELLED') {
+                actionArea = `<p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Annulé</p>`;
+            } else {
+                actionArea = `<p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Non disponible</p>`;
+            }
         }
 
         return `
@@ -295,12 +324,12 @@ function renderEvents() {
                 </svg>
             </div>
             <div class="event-content">
-                <div class="event-date">${formatDate(event.event_date)}</div>
+                <div class="event-date">${formatDate(event.event_date)}${statusBadge}</div>
                 <h3 class="event-title">${event.title}</h3>
                 <p class="event-description">${event.description || 'Pas de description'}</p>
                 <div class="event-footer">
                     <span class="event-reward">+${event.reward_points} pts</span>
-                    ${actionArea}
+                    <div style="flex: 1;">${actionArea}</div>
                 </div>
             </div>
         </div>
@@ -308,26 +337,16 @@ function renderEvents() {
 }
 
 async function participateInEvent(eventId) {
-    if (state.wallets.length === 0 && !state.walletsLoaded) {
-        // Try load wallets first if not loaded
-        // But for participate, we generally need walletId.
-        // Let's assume user has wallet if logged in (auto-created)
-        // Fetch them now if empty
-        const user = JSON.parse(localStorage.getItem('user'));
-        const result = await api.get(`/api/wallets?userId=${user.userId || user.user_id}`);
-        state.wallets = result.data || [];
-    }
-
-    if (state.wallets.length === 0) {
-        showToast('Créez d\'abord un wallet étudiant !', 'error');
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user) {
+        showToast('Connectez-vous d\'abord', 'error');
         return;
     }
 
-    const walletId = state.wallets[0].wallet_id;
-
     try {
-        await api.post(`/api/events/${eventId}/participate`, { walletId });
-        showToast('Participation enregistrée !', 'info');
+        await api.post(`/api/events/${eventId}/participate`, {});
+        showToast('Inscription réussie !', 'success');
+        await loadEvents(); // Refresh to show updated status
     } catch (error) {
         showToast(error.message, 'error');
     }
