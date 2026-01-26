@@ -40,6 +40,15 @@
                 </div>
             </div>
 
+            <div class="glass-panel" style="margin-bottom: 20px;" id="requestsPanel" style="display:none;">
+                <h3 style="margin-top: 0; color:var(--color-orange);">Demandes de Paiement</h3>
+                <div id="pendingRequestsList">
+                    <small>Aucune demande.</small>
+                </div>
+            </div>
+
+
+
             <!-- Settings / Actions -->
             <div class="glass-panel">
                 <h3 style="margin-top: 0;">Paramètres</h3>
@@ -54,8 +63,8 @@
                     <button id="themeToggle" style="background: none; border: none; color: white;">🌙</button>
                 </div>
                 <div style="margin-top: 20px;">
-                    <button class="btn-secondary"
-                        style="width: 100%; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" onclick="logout()">Se
+                    <button id="logoutBtn" class="btn-secondary"
+                        style="width: 100%; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">Se
                         Déconnecter</button>
                 </div>
             </div>
@@ -95,12 +104,27 @@
     </div>
 
     <script>
-        // Inline simple profile logic or move to app.js
-        // Ideally should be in app.js 'loadProfile' but for simplicity keeping small logic here for init
-        // Actually, let's delegate to app.js init logic by just linking it.
-        // But app.js logic needs to be triggered.
         document.addEventListener("DOMContentLoaded", async () => {
-            const user = JSON.parse(localStorage.getItem('user'));
+            let user = JSON.parse(localStorage.getItem('user'));
+
+            // Auto-repair: Refresh user data if BDE ID is missing for admin
+            if (user && user.role === 'bde_admin' && !user.bde_id) {
+                try {
+                    const meRes = await fetch('/api/auth/me', {
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    });
+                    if (meRes.ok) {
+                        const meData = await meRes.json();
+                        // /api/auth/me returns the user object directly, not wrapped in {user: ...}
+                        if (meData && meData.user_id) {
+                            user = { ...user, ...meData };
+                            localStorage.setItem('user', JSON.stringify(user));
+                            console.log("Repaired user profile from server:", user);
+                        }
+                    }
+                } catch (e) { console.error("Failed to refresh profile", e); }
+            }
+
             if (user) {
                 document.getElementById('profileName').textContent = user.full_name || user.email;
                 document.getElementById('profileEmail').textContent = user.email;
@@ -121,14 +145,70 @@
                     document.getElementById('profileBdeName').textContent = 'Aucun BDE assigné';
                 }
             }
+
+
+
+            // Load Payment Requests
+            try {
+                const res = await fetch('/api/payment/requests', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const requests = (await res.json()).data;
+
+                const reqContainer = document.getElementById('requestsPanel');
+                if (requests && requests.length > 0) {
+                    reqContainer.style.display = 'block';
+                    const list = document.getElementById('pendingRequestsList');
+                    list.innerHTML = requests.map(r => `
+                        <div style="background:rgba(255,255,255,0.1); padding:10px; border-radius:8px; margin-bottom:10px;">
+                            <div style="margin-bottom:5px;"><strong>${r.group_name}</strong> demande <span style="color:#ef4444;">${r.amount} Pts</span></div>
+                            <small style="color:#aaa;">${r.description}</small>
+                            <div style="margin-top:10px; display:flex; gap:10px;">
+                                <button class="btn-primary" style="padding:5px 10px; font-size:0.8rem;" onclick="respondRequest('${r.request_id}', 'PAY')">Payer</button>
+                                <button class="btn-secondary" style="padding:5px 10px; font-size:0.8rem;" onclick="respondRequest('${r.request_id}', 'REJECT')">Refuser</button>
+                            </div>
+                        </div>
+                     `).join('');
+                } else {
+                    reqContainer.style.display = 'none';
+                }
+            } catch (e) { console.error("Error loading requests", e); }
+
+            // Bind logout button explicitly
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', logout);
+            }
         });
 
-        function logout() {
+        window.logout = function () {
+            console.log("Logging out...");
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = '/login.html';
         }
+
+        window.respondRequest = async function (reqId, action) {
+            if (!confirm(action === 'PAY' ? "Confirmer le paiement ?" : "Refuser la demande ?")) return;
+
+            try {
+                const res = await fetch(`/api/payment/requests/${reqId}/respond`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify({ action })
+                });
+
+                if (res.ok) {
+                    alert("Action effectuée !");
+                    window.location.reload();
+                } else {
+                    const err = await res.json();
+                    alert("Erreur: " + err.error);
+                }
+            } catch (e) { alert("Erreur réseau"); }
+        }
     </script>
+    <script src="js/app.js"></script>
 </body>
 
 </html>

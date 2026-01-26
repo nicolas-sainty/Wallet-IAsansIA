@@ -119,7 +119,7 @@ class AuthService {
     }
 
     async getUserById(userId) {
-        const { rows } = await db.query('SELECT user_id, email, full_name, role, is_verified, created_at FROM users WHERE user_id = $1', [userId]);
+        const { rows } = await db.query('SELECT user_id, email, full_name, role, is_verified, bde_id, created_at FROM users WHERE user_id = $1', [userId]);
         return rows[0];
     }
 }

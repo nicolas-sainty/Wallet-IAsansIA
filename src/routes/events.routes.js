@@ -26,10 +26,25 @@ router.get('/', async (req, res) => {
             ? await eventService.getEvents(filters)
             : await eventService.getUpcomingEvents();
 
-        res.json(events);
+        res.json({ success: true, data: events });
     } catch (error) {
         logger.error('Error fetching events:', error);
         res.status(500).json({ error: 'Failed to fetch events' });
+    }
+});
+
+/**
+ * GET /api/events/pending
+ * Get all pending participations (admin only)
+ */
+router.get('/pending', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { groupId } = req.query;
+        const pending = await eventService.getPendingParticipations(groupId);
+        res.json({ success: true, data: pending });
+    } catch (error) {
+        logger.error('Error fetching pending participations:', error);
+        res.status(500).json({ error: 'Failed to fetch pending participations' });
     }
 });
 
@@ -45,7 +60,7 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Event not found' });
         }
 
-        res.json(event);
+        res.json({ success: true, data: event });
     } catch (error) {
         logger.error('Error fetching event:', error);
         res.status(500).json({ error: 'Failed to fetch event' });
@@ -207,7 +222,7 @@ router.delete('/:id/participate', requireAuth, async (req, res) => {
 router.get('/:id/participants', requireAuth, async (req, res) => {
     try {
         const participants = await eventService.getEventParticipants(req.params.id);
-        res.json(participants);
+        res.json({ success: true, data: participants });
     } catch (error) {
         logger.error('Error fetching participants:', error);
         res.status(500).json({ error: 'Failed to fetch participants' });

@@ -98,7 +98,7 @@ class EventService {
             // Record participation as registered
             const result = await client.query(
                 `INSERT INTO event_participants (participant_id, event_id, wallet_id, points_earned, status)
-                 VALUES ($1, $2, $3, $4, 'registered')
+                 VALUES ($1, $2, $3, $4, 'pending')
                  RETURNING *`,
                 [participantId, eventId, walletId, event.reward_points]
             );

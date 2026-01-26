@@ -395,6 +395,115 @@ class TransactionService {
             throw error;
         }
     }
+
+    /**
+     * Create a payment request (BDE requesting payment from student)
+     */
+    async createPaymentRequest(bdeGroupId, studentUserId, amount, description) {
+        if (amount <= 0) throw new Error("Amount must be positive");
+
+        const result = await db.query(
+            `INSERT INTO payment_requests (bde_group_id, student_user_id, amount, description, status)
+             VALUES ($1, $2, $3, $4, 'PENDING')
+             RETURNING *`,
+            [bdeGroupId, studentUserId, amount, description]
+        );
+        return result.rows[0];
+    }
+
+    /**
+     * Get pending payment requests for a student
+     */
+    async getStudentPaymentRequests(studentUserId) {
+        const result = await db.query(
+            `SELECT pr.*, g.group_name 
+             FROM payment_requests pr
+             JOIN groups g ON pr.bde_group_id = g.group_id
+             WHERE pr.student_user_id = $1 AND pr.status = 'PENDING'
+             ORDER BY pr.created_at DESC`,
+            [studentUserId]
+        );
+        return result.rows;
+    }
+
+    /**
+     * Get payment requests made by BDE
+     */
+    async getBDEPaymentRequests(bdeGroupId) {
+        const result = await db.query(
+            `SELECT pr.*, u.full_name, u.email
+             FROM payment_requests pr
+             JOIN users u ON pr.student_user_id = u.user_id
+             WHERE pr.bde_group_id = $1
+             ORDER BY pr.created_at DESC`,
+            [bdeGroupId]
+        );
+        return result.rows;
+    }
+
+    /**
+     * Respond to payment request (Pay or Reject)
+     */
+    async respondToPaymentRequest(requestId, studentUserId, action) { // action: 'PAY' or 'REJECT'
+        const reqRes = await db.query("SELECT * FROM payment_requests WHERE request_id = $1", [requestId]);
+        const request = reqRes.rows[0];
+
+        if (!request) throw new Error("Request not found");
+        if (request.student_user_id !== studentUserId) throw new Error("Unauthorized");
+        if (request.status !== 'PENDING') throw new Error("Request already processed");
+
+        if (action === 'REJECT') {
+            await db.query("UPDATE payment_requests SET status = 'REJECTED', updated_at = NOW() WHERE request_id = $1", [requestId]);
+            return { status: 'REJECTED' };
+        }
+
+        if (action === 'PAY') {
+            return await db.transaction(async (client) => {
+                // 1. Initiate Transfer
+                // user->bde transaction logic replicated or called
+                // We need wallet IDs.
+
+                // Get Student Wallet (CREDITS)
+                const sWalletRes = await client.query(
+                    "SELECT wallet_id FROM wallets WHERE user_id = $1 AND currency = 'CREDITS' LIMIT 1",
+                    [studentUserId]
+                );
+                if (sWalletRes.rows.length === 0) throw new Error("No CREDITS wallet found");
+                const sourceWalletId = sWalletRes.rows[0].wallet_id;
+
+                // Get BDE Wallet (CREDITS)
+                const bWalletRes = await client.query(
+                    "SELECT wallet_id FROM wallets WHERE group_id = $1 AND currency = 'CREDITS' LIMIT 1",
+                    [request.bde_group_id]
+                );
+                // Create if missing logic omitted for brevity, assume exists per migration/service
+                if (bWalletRes.rows.length === 0) throw new Error("BDE has no CREDITS wallet");
+                const destWalletId = bWalletRes.rows[0].wallet_id;
+
+                // Check Balance
+                const balanceRes = await walletService.getBalance(sourceWalletId);
+                if (balanceRes.availableBalance < parseFloat(request.amount)) {
+                    throw new Error("Insufficient funds");
+                }
+
+                // Execute Transfer
+                await walletService.updateBalance(client, sourceWalletId, -parseFloat(request.amount));
+                await walletService.updateBalance(client, destWalletId, parseFloat(request.amount));
+
+                // Log Transaction
+                await client.query(
+                    `INSERT INTO transactions (transaction_id, initiator_user_id, source_wallet_id, destination_wallet_id, amount, currency, transaction_type, direction, status, description, created_at)
+                     VALUES ($1, $2, $3, $4, $5, 'CREDITS', 'PAYMENT', 'outgoing', 'SUCCESS', $6, NOW())`,
+                    [uuidv4(), studentUserId, sourceWalletId, destWalletId, request.amount, `Paiement demande: ${request.description}`]
+                );
+
+                // Update Request Status
+                await client.query("UPDATE payment_requests SET status = 'PAID', updated_at = NOW() WHERE request_id = $1", [requestId]);
+
+                return { status: 'PAID' };
+            });
+        }
+    }
 }
 
 module.exports = new TransactionService();

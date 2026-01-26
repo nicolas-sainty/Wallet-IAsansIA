@@ -1,22 +1,35 @@
-/**
- * Authentication Middleware
- * Provides user authentication and role-based access control
- */
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key_change_me';
 
 /**
- * Require user to be authenticated
+ * Require user to be authenticated via JWT
  */
 const requireAuth = (req, res, next) => {
-    if (!req.session || !req.session.user) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({
             error: 'Authentication required',
-            message: 'Vous devez être connecté pour effectuer cette action'
+            message: 'Token manquant ou invalide'
         });
     }
 
-    // Attach user to request
-    req.user = req.session.user;
-    next();
+    const token = authHeader.split(' ')[1];
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = {
+            user_id: decoded.userId,
+            email: decoded.email,
+            role: decoded.role
+        };
+        next();
+    } catch (error) {
+        return res.status(401).json({
+            error: 'Authentication failed',
+            message: 'Session expirée ou invalide. Veuillez vous reconnecter.'
+        });
+    }
 };
 
 /**
@@ -43,11 +56,23 @@ const requireAdmin = (req, res, next) => {
 };
 
 /**
- * Optional auth - attaches user if session exists, but doesn't require it
+ * Optional auth - attaches user if token exists, but doesn't require it
  */
 const optionalAuth = (req, res, next) => {
-    if (req.session && req.session.user) {
-        req.user = req.session.user;
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        try {
+            const decoded = jwt.verify(token, JWT_SECRET);
+            req.user = {
+                user_id: decoded.userId,
+                email: decoded.email,
+                role: decoded.role
+            };
+        } catch (e) {
+            // Ignore invalid token in optional auth
+        }
     }
     next();
 };

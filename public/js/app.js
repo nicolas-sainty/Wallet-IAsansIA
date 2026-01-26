@@ -465,6 +465,39 @@ async function init() {
 
     const path = window.location.pathname;
 
+    const user = JSON.parse(localStorage.getItem('user'));
+
+    // BDE Admin Layout Override
+    if (isAuthenticated() && user && (user.role === 'bde_admin' || user.role === 'admin')) {
+
+        // 2. Override Bottom Nav
+        const nav = document.querySelector('.bottom-nav');
+        if (nav) {
+            nav.innerHTML = `
+                <a href="/admin.html" class="nav-item ${path.includes('admin.html') ? 'active' : ''}">
+                    <span style="font-size:1.2rem;">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/admin-students.html" class="nav-item ${path.includes('admin-students.html') ? 'active' : ''}">
+                    <span style="font-size:1.2rem;">👥</span>
+                    <span>Étudiants</span>
+                </a>
+                <a href="/admin-events.html" class="nav-item ${path.includes('admin-events.html') ? 'active' : ''}">
+                    <span style="font-size:1.2rem;">📅</span>
+                    <span>Events</span>
+                </a>
+                 <a href="/admin-finances.html" class="nav-item ${path.includes('admin-finances.html') ? 'active' : ''}">
+                    <span style="font-size:1.2rem;">💰</span>
+                    <span>Finances</span>
+                </a>
+                <a href="/profile.html" class="nav-item ${path.includes('profile.html') ? 'active' : ''}">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                    <span>Profil</span>
+                </a>
+            `;
+        }
+    }
+
     if (path === '/' || path === '/index.html') {
         if (isAuthenticated()) {
             await loadCardData();
