@@ -23,15 +23,27 @@ const state = {
 
 const api = {
     async get(endpoint) {
-        const response = await fetch(`${API_BASE}${endpoint}`);
+        const token = localStorage.getItem('token');
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_BASE}${endpoint}`, { headers });
         if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
         return await response.json();
     },
 
     async post(endpoint, data) {
+        const token = localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const response = await fetch(`${API_BASE}${endpoint}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify(data),
         });
         if (!response.ok) {
@@ -289,22 +301,52 @@ function renderEvents() {
             : `<small style="color: var(--text-muted);">${event.current_participants || 0} inscrits</small>`;
 
         let actionArea = '';
+        let participantsSection = '';
 
         if (isAdmin) {
+            // BDE View: Show participant count and list
             actionArea = `
                 <div style="margin-top: 0.5rem;">
                     ${participantsInfo}
                 </div>
             `;
+
+            // Add participants list section for BDE
+            participantsSection = `
+                <div id="participants-${event.event_id}" style="margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <small style="color: var(--text-muted); font-weight: 600;">Participants:</small>
+                </div>
+            `;
+            // Auto-load participants for this event
+            setTimeout(() => loadEventParticipants(event.event_id), 100);
         } else {
-            // Student actions based on status
+            // Student View: Check registration status and show appropriate action
+            // We'll check status asynchronously and update the card
+            const eventCardId = `event-action-${event.event_id}`;
+
             if (status === 'OPEN') {
                 actionArea = `
-                    <button class="btn-primary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; width: 100%;" 
-                            onclick="participateInEvent('${event.event_id}')">
-                        S'inscrire
-                    </button>
+                    <div id="${eventCardId}">
+                        <button class="btn-primary" style="font-size: 1rem; padding: 1rem; width: 100%; justify-content: center;" 
+                                onclick="participateInEvent('${event.event_id}')">
+                            S'inscrire
+                        </button>
+                    </div>
                 `;
+                // Check registration status asynchronously
+                setTimeout(async () => {
+                    const regStatus = await checkUserRegistrationStatus(event.event_id);
+                    const actionEl = document.getElementById(eventCardId);
+                    if (actionEl && regStatus) {
+                        if (regStatus === 'pending') {
+                            actionEl.innerHTML = `<span style="background: #f59e0b; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">⏳ En attente de validation</span>`;
+                        } else if (regStatus === 'verified') {
+                            actionEl.innerHTML = `<span style="background: #10b981; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">✅ Présence validée</span>`;
+                        } else if (regStatus === 'rejected') {
+                            actionEl.innerHTML = `<span style="background: #ef4444; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">✗ Refusé</span>`;
+                        }
+                    }
+                }, 100);
             } else if (status === 'FULL') {
                 actionArea = `<p style="color: #f59e0b; font-size: 0.8rem; margin-top: 0.5rem;">Complet</p>`;
             } else if (status === 'CLOSED') {
@@ -315,12 +357,11 @@ function renderEvents() {
                 actionArea = `<p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Non disponible</p>`;
             }
         }
-
         return `
         <div class="event-card">
             <div class="event-image">
                 <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
             </div>
             <div class="event-content">
@@ -331,9 +372,26 @@ function renderEvents() {
                     <span class="event-reward">+${event.reward_points} pts</span>
                     <div style="flex: 1;">${actionArea}</div>
                 </div>
+                ${participantsSection}
             </div>
         </div>
     `}).join('');
+}
+
+// Helper function to check user's registration status for an event
+async function checkUserRegistrationStatus(eventId) {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user) return null;
+
+    try {
+        const result = await api.get(`/api/events/${eventId}/participants`);
+        const participants = result.data || [];
+        const userParticipation = participants.find(p => p.user_id === (user.userId || user.user_id));
+        return userParticipation ? userParticipation.status : null;
+    } catch (error) {
+        console.error('Error checking registration status:', error);
+        return null;
+    }
 }
 
 async function participateInEvent(eventId) {
@@ -343,11 +401,34 @@ async function participateInEvent(eventId) {
         return;
     }
 
+    // Find the button container and button
+    const actionContainer = document.getElementById(`event-action-${eventId}`);
+    if (!actionContainer) return;
+
+    const button = actionContainer.querySelector('button');
+    if (!button) return;
+
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="animation: spin 1s linear infinite; display: inline-block;">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        Inscription...
+    `;
+
     try {
         await api.post(`/api/events/${eventId}/participate`, {});
+        actionContainer.innerHTML = `<span style="background: #10b981; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">✅ Présence validée</span>`;
         showToast('Inscription réussie !', 'success');
-        await loadEvents(); // Refresh to show updated status
+
+        // Reload events after a short delay to show success state
+        setTimeout(async () => {
+            await loadEvents();
+        }, 1500);
     } catch (error) {
+        button.disabled = false;
+        button.textContent = originalText;
         showToast(error.message, 'error');
     }
 }
@@ -462,6 +543,7 @@ async function init() {
     window.closePayModal = closePayModal;
     window.processPayment = processPayment;
     window.buyProduct = buyProduct;
+    window.participateInEvent = participateInEvent;
 
     const path = window.location.pathname;
 

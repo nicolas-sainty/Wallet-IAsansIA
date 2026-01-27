@@ -213,32 +213,56 @@ class EventService {
      */
     async getPendingParticipations(groupId = null) {
         try {
-            let query = supabase
+            // Step 1: Fetch pending participations with Event details and Wallet User ID
+            const { data, error } = await supabase
                 .from('event_participants')
                 .select(`
                     *,
-                    events:event_id (title, group_id),
-                    wallets:wallet_id (
-                        user_id,
-                        users:user_id (full_name, email)
-                    )
+                    events (title, group_id),
+                    wallets (user_id)
                 `)
                 .eq('status', 'pending')
                 .order('participated_at', { ascending: false });
 
-            const { data, error } = await query;
-
             if (error) throw error;
+            if (!data || data.length === 0) return [];
 
-            // Filter by group if specified and flatten
-            let results = (data || []).map(ep => ({
-                ...ep,
-                event_title: ep.events?.title || null,
-                event_group_id: ep.events?.group_id || null,
-                user_name: ep.wallets?.users?.full_name || null,
-                user_email: ep.wallets?.users?.email || null
-            }));
+            // Step 2: Extract User IDs
+            const userIds = data
+                .map(ep => ep.wallets?.user_id)
+                .filter(id => id);
 
+            // Step 3: Fetch Users
+            let userMap = {};
+            if (userIds.length > 0) {
+                const { data: users, error: userError } = await supabase
+                    .from('users')
+                    .select('user_id, full_name, email')
+                    .in('user_id', userIds);
+
+                if (!userError && users) {
+                    userMap = users.reduce((acc, u) => {
+                        acc[u.user_id] = u;
+                        return acc;
+                    }, {});
+                }
+            }
+
+            // Step 4: Merge Data
+            let results = data.map(ep => {
+                const userId = ep.wallets?.user_id;
+                const user = userMap[userId] || {};
+
+                return {
+                    ...ep,
+                    event_title: ep.events?.title || null,
+                    event_group_id: ep.events?.group_id || null,
+                    user_name: user.full_name || 'Unknown',
+                    user_email: user.email || 'Unknown'
+                };
+            });
+
+            // Filter by group if specified
             if (groupId) {
                 results = results.filter(r => r.event_group_id === groupId);
             }
@@ -317,29 +341,70 @@ class EventService {
      * Get participants for an event
      */
     async getEventParticipants(eventId) {
-        const { data, error } = await supabase
+        // Step 1: Get participants and their wallet IDs
+        const { data: participants, error: partError } = await supabase
             .from('event_participants')
             .select(`
                 *,
-                wallets:wallet_id (
-                    user_id,
-                    users:user_id (full_name, email)
+                wallets (
+                    wallet_id,
+                    user_id
                 )
             `)
             .eq('event_id', eventId)
             .order('participated_at', { ascending: false });
 
-        if (error) {
-            logger.error('Error fetching participants:', error);
-            throw error;
+        if (partError) {
+            logger.error('Error fetching participants:', partError);
+            throw partError;
         }
 
-        return (data || []).map(ep => ({
-            ...ep,
-            user_id: ep.wallets?.user_id || null,
-            full_name: ep.wallets?.users?.full_name || null,
-            email: ep.wallets?.users?.email || null
-        }));
+        if (!participants || participants.length === 0) {
+            return [];
+        }
+
+        // Step 2: Get all User IDs
+        const userIds = participants
+            .map(p => p.wallets?.user_id)
+            .filter(id => id); // Remove nulls
+
+        if (userIds.length === 0) {
+            return participants.map(p => ({
+                ...p,
+                user_id: null,
+                full_name: 'Unknown',
+                email: 'Unknown'
+            }));
+        }
+
+        // Step 3: Fetch Users
+        const { data: users, error: userError } = await supabase
+            .from('users')
+            .select('user_id, full_name, email')
+            .in('user_id', userIds);
+
+        if (userError) {
+            logger.error('Error fetching participant users:', userError);
+            // Don't throw, just return without user details
+        }
+
+        // Step 4: Map users back to participants
+        const userMap = (users || []).reduce((acc, user) => {
+            acc[user.user_id] = user;
+            return acc;
+        }, {});
+
+        return participants.map(ep => {
+            const userId = ep.wallets?.user_id;
+            const user = userMap[userId] || {};
+
+            return {
+                ...ep,
+                user_id: userId,
+                full_name: user.full_name || 'Unknown',
+                email: user.email || 'Unknown'
+            };
+        });
     }
 
     /**

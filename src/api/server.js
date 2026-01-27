@@ -24,6 +24,7 @@ app.use(helmet({
         directives: {
             ...helmet.contentSecurityPolicy.getDefaultDirectives(),
             "script-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            "script-src-attr": ["'unsafe-inline'"],
             "connect-src": ["'self'", "https://fonts.googleapis.com"]
         },
     },

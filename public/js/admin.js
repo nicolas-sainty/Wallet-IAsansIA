@@ -2,7 +2,8 @@
 // Admin Dashboard Logic
 // ========================================
 
-const API_BASE = window.location.origin;
+// Reuse API_BASE from app.js if available, otherwise define context-aware base
+const ADMIN_API_BASE = window.location.origin;
 let currentBdeId = null;
 
 // ========================================
@@ -23,7 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     let finalBdeId = userStored.bde_id;
     if (!finalBdeId) {
         try {
-            const meRes = await fetch(`${API_BASE}/api/auth/me`, {
+            const meRes = await fetch(`${ADMIN_API_BASE}/api/auth/me`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             if (meRes.ok) {
@@ -43,7 +44,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!currentBdeId) {
         // Fallback: fetch group where user is admin
         try {
-            const res = await fetch(`${API_BASE}/api/groups`);
+            const res = await fetch(`${ADMIN_API_BASE}/api/groups`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
             const groups = (await res.json()).data;
             const myGroup = groups.find(g => g.admin_user_id === userStored.user_id);
             if (myGroup) {
@@ -74,11 +77,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (addBtn) addBtn.addEventListener('click', addStudent);
     }
     if (document.getElementById('adminEventsList')) {
-        loadEvents();
+        loadAdminEvents();
 
         // Create Event
         const createBtn = document.getElementById('createEventBtn');
-        if (createBtn) createBtn.addEventListener('click', createEvent);
+        if (createBtn) createBtn.addEventListener('click', createAdminEvent);
 
         // Delegation for Participants Buttons
         document.getElementById('adminEventsList').addEventListener('click', (e) => {
@@ -132,14 +135,18 @@ window.onclick = function (event) {
 
 async function loadDashboardStats() {
     try {
-        const res = await fetch(`${API_BASE}/api/groups/${currentBdeId}/stats`);
+        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${currentBdeId}/stats`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const stats = (await res.json()).data;
 
         document.getElementById('statMembers').textContent = stats.total_members || stats.totalWallets || 0;
         document.getElementById('statVolume').textContent = parseFloat(stats.totalVolume || 0).toFixed(2);
 
         // Fetch BDE Wallet (EUR)
-        const wRes = await fetch(`${API_BASE}/api/wallets?groupId=${currentBdeId}`);
+        const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${currentBdeId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const wallets = (await wRes.json()).data;
         const eurWallet = wallets.find(w => w.currency === 'EUR');
         if (eurWallet) {
@@ -161,7 +168,9 @@ async function loadStudents() {
     }
 
     try {
-        const res = await fetch(`${API_BASE}/api/groups/${currentBdeId}/members`);
+        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${currentBdeId}/members`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         if (!res.ok) {
             const errCtx = await res.json();
             throw new Error(`API Error ${res.status}: ${JSON.stringify(errCtx)}`);
@@ -211,7 +220,7 @@ async function addStudent() {
     }
 
     try {
-        const res = await fetch(`${API_BASE}/api/groups/${currentBdeId}/students`, {
+        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${currentBdeId}/students`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: JSON.stringify({ email })
@@ -237,10 +246,12 @@ async function addStudent() {
 // 3. Events Management
 // ========================================
 
-async function loadEvents() {
+async function loadAdminEvents() {
     // Re-use existing GET /api/events logic but filtered? 
     // Currently fetches all OPEN. We might need filtered list for admin to see DRAFT/CLOSED too.
-    const res = await fetch(`${API_BASE}/api/events`);
+    const res = await fetch(`${ADMIN_API_BASE}/api/events`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    });
     const events = (await res.json()).data;
     const myEvents = events.filter(e => e.group_id === currentBdeId);
 
@@ -258,7 +269,7 @@ async function loadEvents() {
     `).join('');
 }
 
-async function createEvent() {
+async function createAdminEvent() {
     const title = document.getElementById('evtTitle').value;
     const date = document.getElementById('evtDate').value;
     const points = document.getElementById('evtPoints').value;
@@ -266,7 +277,7 @@ async function createEvent() {
     if (!title || !date || !points) return;
 
     try {
-        const res = await fetch(`${API_BASE}/api/events`, {
+        const res = await fetch(`${ADMIN_API_BASE}/api/events`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: JSON.stringify({
@@ -280,19 +291,22 @@ async function createEvent() {
         });
         if (res.ok) {
             alert("Événement créé");
-            loadEvents();
+            loadAdminEvents();
             // Clear form
         }
     } catch (e) { console.error(e); }
 }
 
 async function openParticipantsModal(eventId) {
+    window.currentEventId = eventId;
     document.getElementById('participantsModal').style.display = 'block';
     const container = document.getElementById('participantsListCtx');
     container.innerHTML = "Chargement...";
 
     try {
-        const res = await fetch(`${API_BASE}/api/events/pending`);
+        const res = await fetch(`${ADMIN_API_BASE}/api/events/pending`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const all = (await res.json()).data;
         const pending = all.filter(p => p.event_id === eventId);
 
@@ -317,14 +331,26 @@ async function openParticipantsModal(eventId) {
 async function validatePart(pId, status) {
     // Call API
     try {
-        await fetch(`${API_BASE}/api/events/participants/${pId}/validate`, {
+        await fetch(`${ADMIN_API_BASE}/api/events/participants/${pId}/validate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: JSON.stringify({ status })
         });
-        // Close or refresh
-        document.getElementById('participantsModal').style.display = 'none';
+
+        // Refresh the list instead of closing
+        document.getElementById('participantsListCtx').innerHTML = 'Mise à jour...';
+
+        // We need the event ID to refresh. 
+        // Best way is to find it from the current modal context or DOM
+        // Since we don't store it globally, let's close for now but show success clearly, 
+        // OR better: store currentEventId when opening modal
         alert("Traité !");
+
+        if (window.currentEventId) {
+            openParticipantsModal(window.currentEventId);
+        } else {
+            document.getElementById('participantsModal').style.display = 'none';
+        }
     } catch (e) { alert("Erreur"); }
 }
 
@@ -340,7 +366,7 @@ async function loadFinances() {
 
 async function loadPaymentRequests() {
     try {
-        const res = await fetch(`${API_BASE}/api/payment/requests`, {
+        const res = await fetch(`${ADMIN_API_BASE}/api/payment/requests`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const requests = (await res.json()).data;
@@ -365,7 +391,7 @@ async function sendPaymentRequest() {
     if (!studentId || !amount) return;
 
     try {
-        const res = await fetch(`${API_BASE}/api/payment/requests`, {
+        const res = await fetch(`${ADMIN_API_BASE}/api/payment/requests`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: JSON.stringify({
@@ -389,12 +415,16 @@ async function loadTransactions() {
     // History of BDE wallet transactions (Polar.sh sales etc)
     // First get wallet ID
     try {
-        const wRes = await fetch(`${API_BASE}/api/wallets?groupId=${currentBdeId}`);
+        const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${currentBdeId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const wallets = (await wRes.json()).data; // Array of wallets
 
         let allTxs = [];
         for (let w of wallets) {
-            const tRes = await fetch(`${API_BASE}/api/wallets/${w.wallet_id}/transactions`);
+            const tRes = await fetch(`${ADMIN_API_BASE}/api/wallets/${w.wallet_id}/transactions`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
             const txs = (await tRes.json()).data;
             allTxs = [...allTxs, ...txs];
         }
