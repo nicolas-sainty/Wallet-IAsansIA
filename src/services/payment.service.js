@@ -4,9 +4,13 @@ const { supabase } = require('../config/database');
 
 // Mock Product Mapping: Polar Product ID -> Credits Amount
 const PRODUCT_MAPPING = {
-    'product_10_eur': 100,    // 10 EUR = 100 Credits
-    'product_20_eur': 250,    // 20 EUR = 250 Credits (Bonus)
-    'product_50_eur': 1000    // 50 EUR = 1000 Credits (Big Bonus)
+    'pack_10': 20,    // 2 EUR = 20 Credits
+    'pack_50': 50,    // 5 EUR = 50 Credits
+    'pack_100': 100,  // 10 EUR = 100 Credits
+    // Legacy support
+    'product_10_eur': 100,
+    'product_20_eur': 250,
+    'product_50_eur': 1000
 };
 
 class PaymentService {
@@ -20,15 +24,21 @@ class PaymentService {
             return;
         }
 
-        const productId = data.product_id || (data.product && data.product.id) || 'product_10_eur';
+        const productId = data.product_id || (data.product && data.product.id) || 'pack_10';
         const userEmail = data.customer_email || data.email;
+
+        // Use amount directly if provided (from simulation), otherwise map from ID
+        let creditsToAdd = 0;
+        if (data.amount) {
+            creditsToAdd = parseInt(data.amount);
+        } else {
+            creditsToAdd = PRODUCT_MAPPING[productId] || 0;
+        }
 
         if (!userEmail) {
             logger.error('Webhook payload missing email');
             throw new Error('No email found in payload');
         }
-
-        const creditsToAdd = PRODUCT_MAPPING[productId] || 0;
 
         if (creditsToAdd === 0) {
             logger.warn(`Unknown product ID: ${productId}`);
@@ -83,11 +93,12 @@ class PaymentService {
 
         // Calculate Revenue in EUR
         const REVENUE_MAPPING = {
-            100: 10,
-            250: 20,
-            1000: 50
+            20: 2,
+            50: 5,
+            100: 10
         };
-        const revenueEur = REVENUE_MAPPING[points] || 0;
+        // If exact match not found (legacy?), estimate 0.1 ratio
+        const revenueEur = REVENUE_MAPPING[points] || (points / 10);
 
         // NOTE: Supabase JS client doesn't support transactions
         // This is a simplified version - for production, create an RPC function

@@ -452,21 +452,39 @@ class TransactionService {
      * Get pending payment requests for a student
      */
     async getStudentPaymentRequests(studentUserId) {
+        // Step 1: Fetch pending requests
         const { data, error } = await supabase
             .from('payment_requests')
-            .select(`
-                *,
-                groups:bde_group_id (group_name)
-            `)
+            .select('*')
             .eq('student_user_id', studentUserId)
             .eq('status', 'PENDING')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
+        if (!data || data.length === 0) return [];
 
-        return (data || []).map(pr => ({
+        // Step 2: Fetch Group Names
+        const groupIds = [...new Set(data.map(r => r.bde_group_id))];
+        let groupMap = {};
+
+        if (groupIds.length > 0) {
+            const { data: groups } = await supabase
+                .from('groups')
+                .select('group_id, group_name')
+                .in('group_id', groupIds);
+
+            if (groups) {
+                groupMap = groups.reduce((acc, g) => {
+                    acc[g.group_id] = g.group_name;
+                    return acc;
+                }, {});
+            }
+        }
+
+        // Step 3: Merge
+        return data.map(pr => ({
             ...pr,
-            group_name: pr.groups?.group_name || null
+            group_name: groupMap[pr.bde_group_id] || 'Unknown BDE'
         }));
     }
 
@@ -474,21 +492,39 @@ class TransactionService {
      * Get payment requests made by BDE
      */
     async getBDEPaymentRequests(bdeGroupId) {
+        // Step 1: Fetch requests
         const { data, error } = await supabase
             .from('payment_requests')
-            .select(`
-                *,
-                users:student_user_id (full_name, email)
-            `)
+            .select('*')
             .eq('bde_group_id', bdeGroupId)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
+        if (!data || data.length === 0) return [];
 
-        return (data || []).map(pr => ({
+        // Step 2: Fetch Student Details
+        const userIds = [...new Set(data.map(r => r.student_user_id))];
+        let userMap = {};
+
+        if (userIds.length > 0) {
+            const { data: users } = await supabase
+                .from('users')
+                .select('user_id, full_name, email')
+                .in('user_id', userIds);
+
+            if (users) {
+                userMap = users.reduce((acc, u) => {
+                    acc[u.user_id] = u;
+                    return acc;
+                }, {});
+            }
+        }
+
+        // Step 3: Merge
+        return data.map(pr => ({
             ...pr,
-            full_name: pr.users?.full_name || null,
-            email: pr.users?.email || null
+            full_name: userMap[pr.student_user_id]?.full_name || 'Unknown',
+            email: userMap[pr.student_user_id]?.email || 'Unknown'
         }));
     }
 
@@ -533,25 +569,32 @@ class TransactionService {
                 if (!sWallet) throw new Error("No CREDITS wallet found");
                 const sourceWalletId = sWallet.wallet_id;
 
-                // Get BDE Wallet (CREDITS)
+                // Get BDE Wallet (CREDITS) - MUST be the group wallet (user_id is null)
                 const { data: bWallet } = await supabase
                     .from('wallets')
                     .select('wallet_id')
                     .eq('group_id', request.bde_group_id)
+                    .is('user_id', null)
                     .eq('currency', 'CREDITS')
                     .limit(1)
                     .single();
 
-                if (!bWallet) throw new Error("BDE has no CREDITS wallet");
+                if (!bWallet) throw new Error(`BDE has no CREDITS wallet (Group: ${request.bde_group_id})`);
                 const destWalletId = bWallet.wallet_id;
 
                 // Check Balance
                 const balanceRes = await walletService.getBalance(sourceWalletId);
+                logger.info(`Processing Payment:`);
+                logger.info(`- Request: ${requestId} (Amount: ${request.amount})`);
+                logger.info(`- Source (Student): ${sourceWalletId} (Balance: ${balanceRes.availableBalance})`);
+                logger.info(`- Dest (BDE): ${destWalletId} (Group: ${request.bde_group_id})`);
+
                 if (balanceRes.availableBalance < parseFloat(request.amount)) {
                     throw new Error("Insufficient funds");
                 }
 
                 // Execute Transfer
+                logger.info(`Executing transfer: Source=${sourceWalletId}, Dest=${destWalletId}, Amount=${request.amount}`);
                 await walletService.updateBalance(null, sourceWalletId, -parseFloat(request.amount));
                 await walletService.updateBalance(null, destWalletId, parseFloat(request.amount));
 

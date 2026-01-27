@@ -42,16 +42,27 @@ router.post(
 
 /**
  * GET /api/wallets
- * Get wallets (filter by userId)
+ * Get wallets (filter by userId or groupId)
  */
 router.get(
     '/',
-    [query('userId').isUUID().withMessage('User ID is required')],
+    [
+        query('userId').optional().isUUID(),
+        query('groupId').optional().isUUID()
+    ],
     validate,
     async (req, res) => {
         try {
-            const { userId } = req.query;
-            const wallets = await walletService.getWalletsByUser(userId);
+            const { userId, groupId } = req.query;
+
+            if (!userId && !groupId) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'At least one filter (userId or groupId) is required'
+                });
+            }
+
+            const wallets = await walletService.getWallets({ userId, groupId });
             res.json({ success: true, data: wallets });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });

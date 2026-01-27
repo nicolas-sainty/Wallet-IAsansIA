@@ -29,7 +29,7 @@ const api = {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await fetch(`${API_BASE}${endpoint}`, { headers });
+        const response = await fetch(`${API_BASE}${endpoint}`, { headers, cache: 'no-store' });
         if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
         return await response.json();
     },
@@ -140,6 +140,9 @@ async function loadCardData() {
         if (nameEl) nameEl.textContent = user.email;
         if (roleEl) roleEl.textContent = user.role === 'student' ? 'ETUDIANT' : 'BDE / ADMIN';
 
+        // Load Pending Requests on Home
+        loadHomeRequests();
+
         // Fetch User Wallet (CREDITS)
         // Use existing /api/wallets endpoint with userId query
         const result = await api.get(`/api/wallets?userId=${user.userId || user.user_id}`);
@@ -190,16 +193,67 @@ async function loadCardData() {
 
 async function loadGroupsForPay() {
     try {
-        const result = await api.get('/api/groups');
-        const groups = result.data || [];
+        const user = JSON.parse(localStorage.getItem('user'));
         const select = document.getElementById('payRecipientGroup');
         if (!select) return;
 
-        select.innerHTML = '<option value="" disabled selected>Choisir un BDE...</option>' +
-            groups.map(g => `<option value="${g.group_id}">${g.group_name}</option>`).join('');
+        if (!user || !user.bde_id) {
+            select.innerHTML = '<option value="" disabled selected>Aucun BDE assigné</option>';
+            return;
+        }
+
+        const result = await api.get(`/api/groups/${user.bde_id}`);
+        const group = result.data;
+
+        if (group) {
+            select.innerHTML = `<option value="${group.group_id}" selected>${group.group_name}</option>`;
+        } else {
+            select.innerHTML = '<option value="" disabled selected>BDE introuvable</option>';
+        }
     } catch (e) {
         console.error("Error loading groups", e);
     }
+}
+
+async function loadHomeRequests() {
+    const container = document.getElementById('homePendingRequests');
+    if (!container) return;
+
+    try {
+        const res = await api.get('/api/payment/requests');
+        const requests = res.data || [];
+
+        if (requests.length > 0) {
+            container.style.display = 'block';
+            container.innerHTML = requests.map(r => `
+                <div class="glass-panel" style="padding: 1rem; margin-bottom: 0.5rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                        <strong style="color:var(--color-orange);">Demande de Paiement</strong>
+                        <span style="background:var(--color-orange); color:black; padding:2px 8px; border-radius:10px; font-weight:bold;">${r.amount} Pts</span>
+                    </div>
+                    <p style="margin:0 0 1rem 0; font-size:0.9rem;">${r.description || 'Paiement requis'}</p>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn-primary" style="flex:1; padding:0.5rem;" onclick="respondRequestHome('${r.request_id}', 'PAY')">Payer</button>
+                        <button class="btn-secondary" style="flex:1; padding:0.5rem;" onclick="respondRequestHome('${r.request_id}', 'REJECT')">Rejeter</button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Also define helper if not exists
+            if (!window.respondRequestHome) {
+                window.respondRequestHome = async (reqId, action) => {
+                    if (!confirm(action === 'PAY' ? "Confirmer le paiement ?" : "Refuser la demande ?")) return;
+                    try {
+                        await api.post(`/api/payment/requests/${reqId}/respond`, { action });
+                        showToast("Action effectuée !", "success");
+                        setTimeout(() => window.location.reload(), 500);
+                    } catch (e) { showToast(e.message, 'error'); }
+                };
+            }
+        } else {
+            container.style.display = 'none';
+        }
+    } catch (e) { console.error("Home requests error", e); }
 }
 
 function openPayModal() {

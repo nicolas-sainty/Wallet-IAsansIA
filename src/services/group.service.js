@@ -263,28 +263,65 @@ class GroupService {
      */
     async getGroupStats(groupId) {
         try {
-            // Try to get from view
-            const { data, error } = await supabase
-                .from('group_transaction_stats')
-                .select('*')
+            // 1. Count Members (Active wallets in group with user_id)
+            const { count: memberCount, data: wallets, error: walletError } = await supabase
+                .from('wallets')
+                .select('wallet_id', { count: 'exact' })
                 .eq('group_id', groupId)
-                .single();
+                .neq('user_id', null)
+                .eq('status', 'active');
 
-            if (error || !data) {
-                // Return default stats
-                return {
-                    groupId,
-                    totalWallets: 0,
-                    totalTransactions: 0,
-                    totalVolume: 0,
-                    avgTransactionAmount: 0,
-                };
+            if (walletError) throw walletError;
+
+            // 2. Calculate Volume & Transactions (if wallets exist)
+            let totalVolume = 0;
+            let totalTransactions = 0;
+
+            if (wallets && wallets.length > 0) {
+                const walletIds = wallets.map(w => w.wallet_id);
+
+                // Fetch transactions where source OR dest is in walletIds
+                // Note: 'in' filter with OR logic is tricky in one go if checking both columns.
+                // We'll simplify: Fetch transactions where destination is in group (Incoming/Internal)
+                // OR source is in group (Outgoing/Internal).
+                // For "Volume", we might just sum all amounts.
+
+                // Using a simplified approach: Sum 'CREDITS' transactions for these wallets
+                // We'll fetch relevant transactions. LIMIT to 1000 for performance if needed, or use RPC if available.
+                // client-side aggregation for now (assuming not huge history yet).
+
+                const { data: txs, error: txError } = await supabase
+                    .from('transactions')
+                    .select('amount')
+                    .or(`source_wallet_id.in.(${walletIds.join(',')}),destination_wallet_id.in.(${walletIds.join(',')})`)
+                    .eq('currency', 'CREDITS');
+
+                if (!txError && txs) {
+                    totalTransactions = txs.length;
+                    totalVolume = txs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+                }
             }
 
-            return data;
+            return {
+                groupId,
+                total_members: memberCount || 0,
+                totalWallets: memberCount || 0, // Alias
+                totalTransactions,
+                totalVolume,
+                avgTransactionAmount: totalTransactions > 0 ? (totalVolume / totalTransactions) : 0,
+            };
+
         } catch (error) {
-            logger.error('Error fetching group stats', { error: error.message, groupId });
-            throw error;
+            logger.error('Error calculating group stats', { error: error.message, groupId });
+            // Return zeros on error to prevent crash
+            return {
+                groupId,
+                total_members: 0,
+                totalWallets: 0,
+                totalTransactions: 0,
+                totalVolume: 0,
+                avgTransactionAmount: 0,
+            };
         }
     }
 
@@ -295,12 +332,10 @@ class GroupService {
      */
     async getGroupMembers(groupId) {
         try {
+            // Step 1: Fetch wallets
             const { data: wallets, error } = await supabase
                 .from('wallets')
-                .select(`
-                    *,
-                    users:user_id (email, full_name)
-                `)
+                .select('*')
                 .eq('group_id', groupId)
                 .eq('status', 'active')
                 .order('created_at', { ascending: false });
@@ -309,9 +344,33 @@ class GroupService {
                 throw error;
             }
 
-            // For each wallet, count transactions
+            if (!wallets || wallets.length === 0) {
+                return [];
+            }
+
+            // Step 2: Fetch Users
+            const userIds = [...new Set(wallets.map(w => w.user_id).filter(id => id))];
+            let userMap = {};
+
+            if (userIds.length > 0) {
+                const { data: users, error: userError } = await supabase
+                    .from('users')
+                    .select('user_id, email, full_name')
+                    .in('user_id', userIds);
+
+                if (!userError && users) {
+                    userMap = users.reduce((acc, u) => {
+                        acc[u.user_id] = u;
+                        return acc;
+                    }, {});
+                }
+            }
+
+            // Step 3: For each wallet, count transactions and attach user info
             const walletsWithCounts = await Promise.all(
                 (wallets || []).map(async (wallet) => {
+                    const user = userMap[wallet.user_id] || {};
+
                     const { count } = await supabase
                         .from('transactions')
                         .select('*', { count: 'exact', head: true })
@@ -319,8 +378,8 @@ class GroupService {
 
                     return {
                         ...wallet,
-                        email: wallet.users?.email || null,
-                        full_name: wallet.users?.full_name || null,
+                        email: user.email || null,
+                        full_name: user.full_name || null,
                         transaction_count: count || 0
                     };
                 })

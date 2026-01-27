@@ -4,7 +4,7 @@
 
 // Reuse API_BASE from app.js if available, otherwise define context-aware base
 const ADMIN_API_BASE = window.location.origin;
-let currentBdeId = null;
+window.currentBdeId = null;
 
 // ========================================
 // Initialization
@@ -40,8 +40,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (e) { console.error("Failed to refresh user data", e); }
     }
 
-    currentBdeId = finalBdeId;
-    if (!currentBdeId) {
+    window.currentBdeId = finalBdeId;
+    if (!window.currentBdeId) {
         // Fallback: fetch group where user is admin
         try {
             const res = await fetch(`${ADMIN_API_BASE}/api/groups`, {
@@ -50,15 +50,15 @@ document.addEventListener("DOMContentLoaded", async () => {
             const groups = (await res.json()).data;
             const myGroup = groups.find(g => g.admin_user_id === userStored.user_id);
             if (myGroup) {
-                currentBdeId = myGroup.group_id;
+                window.currentBdeId = myGroup.group_id;
                 // Save it for next time
-                userStored.bde_id = currentBdeId;
+                userStored.bde_id = window.currentBdeId;
                 localStorage.setItem('user', JSON.stringify(userStored));
             }
         } catch (e) { console.error(e); }
     }
 
-    if (!currentBdeId) {
+    if (!window.currentBdeId) {
         console.warn("No BDE assigned found for admin.");
         // We do NOT return/block here immediately if we can avoid it, 
         // to allow viewing parts of UI that might not need it? 
@@ -135,7 +135,9 @@ window.onclick = function (event) {
 
 async function loadDashboardStats() {
     try {
-        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${currentBdeId}/stats`, {
+        if (!window.currentBdeId) return; // Wait for init
+
+        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${window.currentBdeId}/stats`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const stats = (await res.json()).data;
@@ -144,7 +146,7 @@ async function loadDashboardStats() {
         document.getElementById('statVolume').textContent = parseFloat(stats.totalVolume || 0).toFixed(2);
 
         // Fetch BDE Wallet (EUR)
-        const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${currentBdeId}`, {
+        const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${window.currentBdeId}`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const wallets = (await wRes.json()).data;
@@ -161,14 +163,16 @@ async function loadDashboardStats() {
 // ========================================
 
 async function loadStudents() {
-    console.log("Loading students for BDE:", currentBdeId);
-    if (!currentBdeId) {
-        document.getElementById('studentsList').innerHTML = '<p class="error">Erreur: BDE ID non trouvé (null).</p>';
+    console.log("Loading students for BDE:", window.currentBdeId);
+    const list = document.getElementById('studentsList');
+
+    if (!window.currentBdeId) {
+        if (list) list.innerHTML = '<p class="error">Erreur: BDE ID non trouvé (null).</p>';
         return;
     }
 
     try {
-        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${currentBdeId}/members`, {
+        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${window.currentBdeId}/members`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         if (!res.ok) {
@@ -178,29 +182,32 @@ async function loadStudents() {
         const members = (await res.json()).data;
 
         if (!members || members.length === 0) {
-            document.getElementById('studentsList').innerHTML = '<p class="text-muted">Aucun étudiant membre pour le moment.</p>';
-            return;
+            if (list) list.innerHTML = '<p class="text-muted">Aucun étudiant membre pour le moment.</p>';
+            // Don't return, allow select population (might be empty but that's fine)
+        } else {
+            if (list) {
+                list.innerHTML = members.map(m => `
+                    <div class="list-item">
+                        <div class="item-info">
+                        <strong>${m.full_name || m.email}</strong> <small class="text-muted">(${truncateId(m.user_id)})</small>
+                        <span class="sub-text">Balance: ${parseFloat(m.balance).toFixed(2)} ${m.currency}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
         }
 
-        const list = document.getElementById('studentsList');
-        list.innerHTML = members.map(m => `
-            <div class="list-item">
-                <div class="item-info">
-                   <strong>${m.full_name || m.email}</strong> <small class="text-muted">(${truncateId(m.user_id)})</small>
-                   <span class="sub-text">Balance: ${parseFloat(m.balance).toFixed(2)} ${m.currency}</span>
-                </div>
-            </div>
-        `).join('');
+
 
         // Populate Select for Payments
         const select = document.getElementById('paymentTargetStudent');
         if (select) {
             select.innerHTML = members.map(m => `<option value="${m.user_id}">${m.full_name || m.email}</option>`).join('');
         }
-
     } catch (e) {
         console.error("Load Students Failed:", e);
-        document.getElementById('studentsList').innerHTML = `<p class="error">Erreur: ${e.message}</p>`;
+        const list = document.getElementById('studentsList');
+        if (list) list.innerHTML = `<p class="error">Erreur: ${e.message}</p>`;
     }
 }
 
@@ -208,9 +215,9 @@ async function addStudent() {
     const emailEl = document.getElementById('newStudentEmail');
     const email = emailEl.value;
 
-    console.log(`Add Student clicked. Email: ${email}, BDE: ${currentBdeId}`);
+    console.log(`Add Student clicked. Email: ${email}, BDE: ${window.currentBdeId}`);
 
-    if (!currentBdeId) {
+    if (!window.currentBdeId) {
         alert("Erreur critique: ID du BDE non chargé. Rechargez la page.");
         return;
     }
@@ -220,7 +227,7 @@ async function addStudent() {
     }
 
     try {
-        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${currentBdeId}/students`, {
+        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${window.currentBdeId}/students`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: JSON.stringify({ email })

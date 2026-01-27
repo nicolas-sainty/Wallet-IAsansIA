@@ -198,8 +198,27 @@ class EventService {
                         .from('wallets')
                         .update({ balance: newBalance })
                         .eq('wallet_id', participation.wallet_id);
+
+                    // 4. Create Transaction Record
+                    const { v4: uuidv4 } = require('uuid');
+                    await supabase
+                        .from('transactions')
+                        .insert({
+                            transaction_id: uuidv4(),
+                            initiator_user_id: null, // System/Admin action
+                            source_wallet_id: null, // Minting/System
+                            destination_wallet_id: participation.wallet_id,
+                            amount: parseFloat(participation.points_earned),
+                            currency: 'CREDITS',
+                            status: 'SUCCESS',
+                            type: 'REWARD',
+                            description: `Gain événement: Event ${participation.event_id}`,
+                            created_at: new Date().toISOString(),
+                            executed_at: new Date().toISOString()
+                        });
                 }
             }
+
 
             return { success: true, status };
         } catch (error) {

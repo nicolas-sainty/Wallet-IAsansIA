@@ -48,20 +48,28 @@ class WalletService {
     }
 
     /**
-     * Get all wallets for a specific user
-     * @param {string} userId 
+     * Get wallets with filters
+     * @param {Object} filters - { userId, groupId }
      */
-    async getWalletsByUser(userId) {
-        const { data, error } = await supabase
+    async getWallets(filters = {}) {
+        let query = supabase
             .from('wallets')
             .select(`
                 *,
                 groups:group_id (group_name)
-            `)
-            .eq('user_id', userId);
+            `);
+
+        if (filters.userId) {
+            query = query.eq('user_id', filters.userId);
+        }
+        if (filters.groupId) {
+            query = query.eq('group_id', filters.groupId);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
-            logger.error('Error fetching user wallets', { error: error.message, userId });
+            logger.error('Error fetching wallets', { error: error.message, filters });
             return [];
         }
 
@@ -70,6 +78,14 @@ class WalletService {
             ...wallet,
             group_name: wallet.groups?.group_name || null
         }));
+    }
+
+    /**
+     * Get all wallets for a specific user
+     * @param {string} userId 
+     */
+    async getWalletsByUser(userId) {
+        return this.getWallets({ userId });
     }
 
     /**
@@ -261,7 +277,16 @@ class WalletService {
                 throw error;
             }
 
-            return data || [];
+            // Adjust amount sign based on flow direction relative to this wallet
+            const history = (data || []).map(tx => {
+                const isSource = tx.source_wallet_id === walletId;
+                return {
+                    ...tx,
+                    amount: isSource ? -Math.abs(tx.amount) : Math.abs(tx.amount)
+                };
+            });
+
+            return history;
         } catch (error) {
             logger.error('Error fetching transaction history', { error: error.message, walletId });
             throw error;

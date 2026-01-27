@@ -24,11 +24,33 @@ router.post('/simulate', async (req, res) => {
         }
 
         // Mimic Polar Payload
+        let amount = 0;
+        let cost = 0;
+        switch (productId) {
+            case 'pack_10': // Pack Découverte (2€)
+                amount = 20;
+                cost = 2;
+                break;
+            case 'pack_50': // Pack Standard (5€)
+                amount = 50;
+                cost = 5;
+                break;
+            case 'pack_100': // Pack Premium (10€)
+                amount = 100;
+                cost = 10;
+                break;
+            default:
+                amount = 10;
+                cost = 1;
+        }
+
         const mockPayload = {
             type: 'order.paid',
             data: {
                 product_id: productId,
-                customer_email: email
+                customer_email: email,
+                amount: amount, // Add this
+                cost: cost      // Add this
             }
         };
 
@@ -55,12 +77,27 @@ router.post('/requests', auth.requireAuth, async (req, res) => {
     try {
         const { studentUserId, amount, description } = req.body;
         // Verify user is BDE Admin
-        if (!req.user.bde_id || (req.user.role !== 'bde_admin' && req.user.role !== 'admin')) {
+        // Verify user is BDE Admin (Role check confirms permission)
+        if (req.user.role !== 'bde_admin' && req.user.role !== 'admin') {
             return res.status(403).json({ error: "Only BDE Admins can create requests" });
         }
 
+        // Fetch user's BDE ID from database since it's not in the token
+        const { supabase } = require('../config/database');
+        const { data: user } = await supabase
+            .from('users')
+            .select('bde_id')
+            .eq('user_id', req.user.user_id)
+            .single();
+
+        const bdeId = user?.bde_id;
+
+        if (!bdeId) {
+            return res.status(403).json({ error: "No BDE associated with this admin account" });
+        }
+
         const request = await transactionService.createPaymentRequest(
-            req.user.bde_id,
+            bdeId,
             studentUserId,
             parseFloat(amount),
             description
