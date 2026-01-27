@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-const db = require('../config/database');
+const { supabase } = require('../config/database');
 const logger = require('../config/logger');
 const walletService = require('./wallet.service');
 
@@ -48,30 +48,28 @@ class TransactionService {
             }
 
             const transactionId = uuidv4();
-            const direction = 'outgoing'; // From initiator's perspective
+            const direction = 'outgoing';
 
-            const query = `
-        INSERT INTO transactions (
-          transaction_id, initiator_user_id, source_wallet_id, destination_wallet_id,
-          amount, currency, transaction_type, direction, status,
-          description, country, city, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9, $10, $11, NOW())
-        RETURNING *
-      `;
+            const { data, error } = await supabase
+                .from('transactions')
+                .insert({
+                    transaction_id: transactionId,
+                    initiator_user_id: initiatorUserId,
+                    source_wallet_id: sourceWalletId,
+                    destination_wallet_id: destinationWalletId,
+                    amount,
+                    currency,
+                    transaction_type: transactionType,
+                    direction,
+                    status: 'PENDING',
+                    description,
+                    country,
+                    city
+                })
+                .select()
+                .single();
 
-            const { rows } = await db.query(query, [
-                transactionId,
-                initiatorUserId,
-                sourceWalletId,
-                destinationWalletId,
-                amount,
-                currency,
-                transactionType,
-                direction,
-                description,
-                country,
-                city,
-            ]);
+            if (error) throw error;
 
             logger.info('Transaction initiated', {
                 transactionId,
@@ -88,7 +86,7 @@ class TransactionService {
                 });
             });
 
-            return rows[0];
+            return data;
         } catch (error) {
             logger.error('Error initiating transaction', { error: error.message, params });
             throw error;
@@ -97,86 +95,89 @@ class TransactionService {
 
     /**
      * Process a pending transaction
+     * NOTE: This should ideally be an RPC function for atomicity
      * @param {string} transactionId - Transaction ID
      * @returns {Promise<Object>} Processed transaction
      */
     async processTransaction(transactionId) {
-        return await db.transaction(async (client) => {
-            try {
-                // Get transaction details
-                const txQuery = 'SELECT * FROM transactions WHERE transaction_id = $1';
-                const txResult = await client.query(txQuery, [transactionId]);
+        try {
+            // Get transaction details
+            const { data: transaction, error: txError } = await supabase
+                .from('transactions')
+                .select('*')
+                .eq('transaction_id', transactionId)
+                .single();
 
-                if (txResult.rows.length === 0) {
-                    throw new Error('Transaction not found');
-                }
-
-                const transaction = txResult.rows[0];
-
-                if (transaction.status !== 'PENDING') {
-                    throw new Error('Transaction already processed');
-                }
-
-                // Debit source wallet
-                await walletService.updateBalance(
-                    client,
-                    transaction.source_wallet_id,
-                    -transaction.amount
-                );
-
-                // Credit destination wallet
-                await walletService.updateBalance(
-                    client,
-                    transaction.destination_wallet_id,
-                    transaction.amount
-                );
-
-                // Update transaction status
-                const updateQuery = `
-          UPDATE transactions 
-          SET status = 'SUCCESS', executed_at = NOW()
-          WHERE transaction_id = $1
-          RETURNING *
-        `;
-
-                const result = await client.query(updateQuery, [transactionId]);
-
-                logger.info('Transaction processed successfully', { transactionId });
-
-                // Update trust scores if inter-group
-                const sourceWallet = await walletService.getWallet(transaction.source_wallet_id);
-                const destWallet = await walletService.getWallet(transaction.destination_wallet_id);
-
-                if (sourceWallet.group_id !== destWallet.group_id) {
-                    await this.updateTrustScore(
-                        client,
-                        sourceWallet.group_id,
-                        destWallet.group_id,
-                        transaction.amount,
-                        true
-                    );
-                }
-
-                return result.rows[0];
-            } catch (error) {
-                // Update transaction as failed
-                const failQuery = `
-          UPDATE transactions 
-          SET status = 'FAILED', reason_code = $1, executed_at = NOW()
-          WHERE transaction_id = $2
-          RETURNING *
-        `;
-
-                await client.query(failQuery, [error.message, transactionId]);
-
-                logger.error('Transaction processing failed', {
-                    transactionId,
-                    error: error.message,
-                });
-
-                throw error;
+            if (txError || !transaction) {
+                throw new Error('Transaction not found');
             }
-        });
+
+            if (transaction.status !== 'PENDING') {
+                throw new Error('Transaction already processed');
+            }
+
+            // Debit source wallet
+            await walletService.updateBalance(
+                null, // No client in Supabase
+                transaction.source_wallet_id,
+                -transaction.amount
+            );
+
+            // Credit destination wallet
+            await walletService.updateBalance(
+                null,
+                transaction.destination_wallet_id,
+                transaction.amount
+            );
+
+            // Update transaction status
+            const { data: updatedTx, error: updateError } = await supabase
+                .from('transactions')
+                .update({
+                    status: 'SUCCESS',
+                    executed_at: new Date().toISOString()
+                })
+                .eq('transaction_id', transactionId)
+                .select()
+                .single();
+
+            if (updateError) throw updateError;
+
+            logger.info('Transaction processed successfully', { transactionId });
+
+            // Update trust scores if inter-group
+            const sourceWallet = await walletService.getWallet(transaction.source_wallet_id);
+            const destWallet = await walletService.getWallet(transaction.destination_wallet_id);
+
+            if (sourceWallet.group_id !== destWallet.group_id) {
+                await this.updateTrustScore(
+                    null,
+                    sourceWallet.group_id,
+                    destWallet.group_id,
+                    transaction.amount,
+                    true
+                );
+            }
+
+            return updatedTx;
+        } catch (error) {
+            // Update transaction as failed
+            await supabase
+                .from('transactions')
+                .update({
+                    status: 'FAILED',
+                    reason_code: error.message,
+                    executed_at: new Date().toISOString()
+                })
+                .eq('transaction_id', transactionId);
+
+            logger.error('Transaction processing failed', {
+                transactionId,
+                error: error.message,
+            });
+
+            throw error;
+        }
     }
 
     /**
@@ -188,14 +189,14 @@ class TransactionService {
     async validateInterGroupTransaction(fromGroupId, toGroupId, amount) {
         try {
             // Check exchange rules
-            const rulesQuery = `
-        SELECT * FROM exchange_rules
-        WHERE from_group_id = $1 AND to_group_id = $2 AND active = true
-      `;
+            const { data: rules } = await supabase
+                .from('exchange_rules')
+                .select('*')
+                .eq('from_group_id', fromGroupId)
+                .eq('to_group_id', toGroupId)
+                .eq('active', true);
 
-            const { rows: rules } = await db.query(rulesQuery, [fromGroupId, toGroupId]);
-
-            if (rules.length > 0) {
+            if (rules && rules.length > 0) {
                 const rule = rules[0];
 
                 // Check max transaction amount
@@ -203,19 +204,18 @@ class TransactionService {
                     throw new Error(`Transaction exceeds maximum allowed amount: ${rule.max_transaction_amount}`);
                 }
 
-                // Check daily limit
+                // Check daily limit (simplified - should use RPC for accurate calculation)
                 if (rule.daily_limit) {
-                    const dailyQuery = `
-            SELECT COALESCE(SUM(amount), 0) as total
-            FROM transactions
-            WHERE source_wallet_id IN (SELECT wallet_id FROM wallets WHERE group_id = $1)
-              AND destination_wallet_id IN (SELECT wallet_id FROM wallets WHERE group_id = $2)
-              AND created_at >= NOW() - INTERVAL '24 hours'
-              AND status = 'SUCCESS'
-          `;
+                    const oneDayAgo = new Date();
+                    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
 
-                    const { rows: dailyResult } = await db.query(dailyQuery, [fromGroupId, toGroupId]);
-                    const dailyTotal = parseFloat(dailyResult[0].total);
+                    const { data: recentTx } = await supabase
+                        .from('transactions')
+                        .select('amount')
+                        .gte('created_at', oneDayAgo.toISOString())
+                        .eq('status', 'SUCCESS');
+
+                    const dailyTotal = (recentTx || []).reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
 
                     if (dailyTotal + amount > parseFloat(rule.daily_limit)) {
                         throw new Error('Daily transaction limit exceeded');
@@ -224,15 +224,15 @@ class TransactionService {
             }
 
             // Check trust score
-            const trustQuery = `
-        SELECT trust_score FROM group_trust_scores
-        WHERE from_group_id = $1 AND to_group_id = $2
-      `;
+            const { data: trustResult } = await supabase
+                .from('group_trust_scores')
+                .select('trust_score')
+                .eq('from_group_id', fromGroupId)
+                .eq('to_group_id', toGroupId)
+                .single();
 
-            const { rows: trustResult } = await db.query(trustQuery, [fromGroupId, toGroupId]);
-
-            if (trustResult.length > 0) {
-                const trustScore = parseFloat(trustResult[0].trust_score);
+            if (trustResult) {
+                const trustScore = parseFloat(trustResult.trust_score);
                 const minTrustScore = parseFloat(process.env.MIN_TRUST_SCORE_FOR_TRANSACTION || '20.00');
 
                 if (trustScore < minTrustScore) {
@@ -251,7 +251,8 @@ class TransactionService {
 
     /**
      * Update trust score between groups after transaction
-     * @param {Object} client - Database client
+     * NOTE: This should be an RPC function for proper UPSERT logic
+     * @param {Object} client - Not used with Supabase
      * @param {string} fromGroupId - Source group ID
      * @param {string} toGroupId - Destination group ID
      * @param {number} amount - Transaction amount
@@ -259,33 +260,49 @@ class TransactionService {
      */
     async updateTrustScore(client, fromGroupId, toGroupId, amount, success) {
         try {
-            const query = `
-        INSERT INTO group_trust_scores (
-          trust_id, from_group_id, to_group_id, total_transactions, total_volume,
-          successful_transactions, failed_transactions
-        ) VALUES (
-          $1, $2, $3, 1, $4, $5, $6
-        )
-        ON CONFLICT (from_group_id, to_group_id)
-        DO UPDATE SET
-          total_transactions = group_trust_scores.total_transactions + 1,
-          total_volume = group_trust_scores.total_volume + $4,
-          successful_transactions = group_trust_scores.successful_transactions + $5,
-          failed_transactions = group_trust_scores.failed_transactions + $6,
-          trust_score = LEAST(100, GREATEST(0, 
-            50 + (EXCLUDED.successful_transactions::float / NULLIF(EXCLUDED.total_transactions, 0) * 50)
-          )),
-          last_updated = NOW()
-      `;
+            // Check if trust score exists
+            const { data: existing } = await supabase
+                .from('group_trust_scores')
+                .select('*')
+                .eq('from_group_id', fromGroupId)
+                .eq('to_group_id', toGroupId)
+                .single();
 
-            await client.query(query, [
-                uuidv4(),
-                fromGroupId,
-                toGroupId,
-                amount,
-                success ? 1 : 0,
-                success ? 0 : 1,
-            ]);
+            if (existing) {
+                // Update existing
+                const newTotalTx = existing.total_transactions + 1;
+                const newSuccessful = existing.successful_transactions + (success ? 1 : 0);
+                const newFailed = existing.failed_transactions + (success ? 0 : 1);
+                const newVolume = parseFloat(existing.total_volume) + amount;
+                const newTrustScore = Math.min(100, Math.max(0, 50 + (newSuccessful / newTotalTx * 50)));
+
+                await supabase
+                    .from('group_trust_scores')
+                    .update({
+                        total_transactions: newTotalTx,
+                        total_volume: newVolume,
+                        successful_transactions: newSuccessful,
+                        failed_transactions: newFailed,
+                        trust_score: newTrustScore,
+                        last_updated: new Date().toISOString()
+                    })
+                    .eq('from_group_id', fromGroupId)
+                    .eq('to_group_id', toGroupId);
+            } else {
+                // Insert new
+                await supabase
+                    .from('group_trust_scores')
+                    .insert({
+                        trust_id: uuidv4(),
+                        from_group_id: fromGroupId,
+                        to_group_id: toGroupId,
+                        total_transactions: 1,
+                        total_volume: amount,
+                        successful_transactions: success ? 1 : 0,
+                        failed_transactions: success ? 0 : 1,
+                        trust_score: success ? 75 : 25
+                    });
+            }
         } catch (error) {
             logger.error('Error updating trust score', { error: error.message });
             // Non-critical, don't throw
@@ -299,13 +316,17 @@ class TransactionService {
      */
     async getTransaction(transactionId) {
         try {
-            const result = await db.query('SELECT * FROM transactions WHERE transaction_id = $1', [transactionId]);
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('*')
+                .eq('transaction_id', transactionId)
+                .single();
 
-            if (result.rows.length === 0) {
+            if (error || !data) {
                 throw new Error('Transaction not found');
             }
 
-            return result.rows[0];
+            return data;
         } catch (error) {
             logger.error('Error fetching transaction', { error: error.message, transactionId });
             throw error;
@@ -314,22 +335,24 @@ class TransactionService {
 
     async cancelTransaction(transactionId) {
         try {
-            const query = `
-        UPDATE transactions 
-        SET status = 'CANCELED', reason_code = 'USER_CANCELED'
-        WHERE transaction_id = $1 AND status = 'PENDING'
-        RETURNING *
-      `;
+            const { data, error } = await supabase
+                .from('transactions')
+                .update({
+                    status: 'CANCELED',
+                    reason_code: 'USER_CANCELED'
+                })
+                .eq('transaction_id', transactionId)
+                .eq('status', 'PENDING')
+                .select()
+                .single();
 
-            const result = await db.query(query, [transactionId]);
-
-            if (result.rows.length === 0) {
+            if (error || !data) {
                 throw new Error('Transaction not found or cannot be canceled');
             }
 
             logger.info('Transaction canceled', { transactionId });
 
-            return result.rows[0];
+            return data;
         } catch (error) {
             logger.error('Error canceling transaction', { error: error.message, transactionId });
             throw error;
@@ -345,35 +368,42 @@ class TransactionService {
     async transferCredits(userId, groupId, amount) {
         try {
             // 1. Get Source Wallet (Student - CREDITS)
-            // Assuming 1 active wallet per user for simplicity
-            const { rows: userWallets } = await db.query(
-                "SELECT * FROM wallets WHERE user_id = $1 AND currency = 'CREDITS' AND status = 'active' LIMIT 1",
-                [userId]
-            );
+            const { data: userWallets } = await supabase
+                .from('wallets')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('currency', 'CREDITS')
+                .eq('status', 'active')
+                .limit(1);
 
-            if (userWallets.length === 0) {
-                // Fallback: Check if they found an old PTS wallet that migrated
+            if (!userWallets || userWallets.length === 0) {
                 throw new Error('No active CREDITS wallet found for user');
             }
             const sourceWallet = userWallets[0];
 
             // 2. Get Destination Wallet (Group - CREDITS)
-            let { rows: groupWallets } = await db.query(
-                "SELECT * FROM wallets WHERE group_id = $1 AND currency = 'CREDITS' AND status = 'active' LIMIT 1",
-                [groupId]
-            );
+            let { data: groupWallets } = await supabase
+                .from('wallets')
+                .select('*')
+                .eq('group_id', groupId)
+                .eq('currency', 'CREDITS')
+                .eq('status', 'active')
+                .limit(1);
 
             let destWalletId;
-            if (groupWallets.length === 0) {
+            if (!groupWallets || groupWallets.length === 0) {
                 // Create CREDITS wallet for Group if missing
                 logger.info(`Creating CREDITS wallet for group ${groupId}`);
                 const newWalletId = uuidv4();
-                // We need admin_user_id to create wallet? Schema allows null user_id if group_id is present
-                await db.query(
-                    `INSERT INTO wallets (wallet_id, group_id, currency, balance, status)
-                     VALUES ($1, $2, 'CREDITS', 0.00000000, 'active')`,
-                    [newWalletId, groupId]
-                );
+                await supabase
+                    .from('wallets')
+                    .insert({
+                        wallet_id: newWalletId,
+                        group_id: groupId,
+                        currency: 'CREDITS',
+                        balance: 0.00000000,
+                        status: 'active'
+                    });
                 destWalletId = newWalletId;
             } else {
                 destWalletId = groupWallets[0].wallet_id;
@@ -402,83 +432,118 @@ class TransactionService {
     async createPaymentRequest(bdeGroupId, studentUserId, amount, description) {
         if (amount <= 0) throw new Error("Amount must be positive");
 
-        const result = await db.query(
-            `INSERT INTO payment_requests (bde_group_id, student_user_id, amount, description, status)
-             VALUES ($1, $2, $3, $4, 'PENDING')
-             RETURNING *`,
-            [bdeGroupId, studentUserId, amount, description]
-        );
-        return result.rows[0];
+        const { data, error } = await supabase
+            .from('payment_requests')
+            .insert({
+                bde_group_id: bdeGroupId,
+                student_user_id: studentUserId,
+                amount,
+                description,
+                status: 'PENDING'
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
     }
 
     /**
      * Get pending payment requests for a student
      */
     async getStudentPaymentRequests(studentUserId) {
-        const result = await db.query(
-            `SELECT pr.*, g.group_name 
-             FROM payment_requests pr
-             JOIN groups g ON pr.bde_group_id = g.group_id
-             WHERE pr.student_user_id = $1 AND pr.status = 'PENDING'
-             ORDER BY pr.created_at DESC`,
-            [studentUserId]
-        );
-        return result.rows;
+        const { data, error } = await supabase
+            .from('payment_requests')
+            .select(`
+                *,
+                groups:bde_group_id (group_name)
+            `)
+            .eq('student_user_id', studentUserId)
+            .eq('status', 'PENDING')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return (data || []).map(pr => ({
+            ...pr,
+            group_name: pr.groups?.group_name || null
+        }));
     }
 
     /**
      * Get payment requests made by BDE
      */
     async getBDEPaymentRequests(bdeGroupId) {
-        const result = await db.query(
-            `SELECT pr.*, u.full_name, u.email
-             FROM payment_requests pr
-             JOIN users u ON pr.student_user_id = u.user_id
-             WHERE pr.bde_group_id = $1
-             ORDER BY pr.created_at DESC`,
-            [bdeGroupId]
-        );
-        return result.rows;
+        const { data, error } = await supabase
+            .from('payment_requests')
+            .select(`
+                *,
+                users:student_user_id (full_name, email)
+            `)
+            .eq('bde_group_id', bdeGroupId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return (data || []).map(pr => ({
+            ...pr,
+            full_name: pr.users?.full_name || null,
+            email: pr.users?.email || null
+        }));
     }
 
     /**
      * Respond to payment request (Pay or Reject)
+     * NOTE: This should be an RPC function for atomicity
      */
-    async respondToPaymentRequest(requestId, studentUserId, action) { // action: 'PAY' or 'REJECT'
-        const reqRes = await db.query("SELECT * FROM payment_requests WHERE request_id = $1", [requestId]);
-        const request = reqRes.rows[0];
+    async respondToPaymentRequest(requestId, studentUserId, action) {
+        const { data: request, error: reqError } = await supabase
+            .from('payment_requests')
+            .select('*')
+            .eq('request_id', requestId)
+            .single();
 
-        if (!request) throw new Error("Request not found");
+        if (reqError || !request) throw new Error("Request not found");
         if (request.student_user_id !== studentUserId) throw new Error("Unauthorized");
         if (request.status !== 'PENDING') throw new Error("Request already processed");
 
         if (action === 'REJECT') {
-            await db.query("UPDATE payment_requests SET status = 'REJECTED', updated_at = NOW() WHERE request_id = $1", [requestId]);
+            await supabase
+                .from('payment_requests')
+                .update({
+                    status: 'REJECTED',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('request_id', requestId);
             return { status: 'REJECTED' };
         }
 
         if (action === 'PAY') {
-            return await db.transaction(async (client) => {
-                // 1. Initiate Transfer
-                // user->bde transaction logic replicated or called
-                // We need wallet IDs.
-
+            // Simplified - should use RPC for atomicity
+            try {
                 // Get Student Wallet (CREDITS)
-                const sWalletRes = await client.query(
-                    "SELECT wallet_id FROM wallets WHERE user_id = $1 AND currency = 'CREDITS' LIMIT 1",
-                    [studentUserId]
-                );
-                if (sWalletRes.rows.length === 0) throw new Error("No CREDITS wallet found");
-                const sourceWalletId = sWalletRes.rows[0].wallet_id;
+                const { data: sWallet } = await supabase
+                    .from('wallets')
+                    .select('wallet_id')
+                    .eq('user_id', studentUserId)
+                    .eq('currency', 'CREDITS')
+                    .limit(1)
+                    .single();
+
+                if (!sWallet) throw new Error("No CREDITS wallet found");
+                const sourceWalletId = sWallet.wallet_id;
 
                 // Get BDE Wallet (CREDITS)
-                const bWalletRes = await client.query(
-                    "SELECT wallet_id FROM wallets WHERE group_id = $1 AND currency = 'CREDITS' LIMIT 1",
-                    [request.bde_group_id]
-                );
-                // Create if missing logic omitted for brevity, assume exists per migration/service
-                if (bWalletRes.rows.length === 0) throw new Error("BDE has no CREDITS wallet");
-                const destWalletId = bWalletRes.rows[0].wallet_id;
+                const { data: bWallet } = await supabase
+                    .from('wallets')
+                    .select('wallet_id')
+                    .eq('group_id', request.bde_group_id)
+                    .eq('currency', 'CREDITS')
+                    .limit(1)
+                    .single();
+
+                if (!bWallet) throw new Error("BDE has no CREDITS wallet");
+                const destWalletId = bWallet.wallet_id;
 
                 // Check Balance
                 const balanceRes = await walletService.getBalance(sourceWalletId);
@@ -487,21 +552,39 @@ class TransactionService {
                 }
 
                 // Execute Transfer
-                await walletService.updateBalance(client, sourceWalletId, -parseFloat(request.amount));
-                await walletService.updateBalance(client, destWalletId, parseFloat(request.amount));
+                await walletService.updateBalance(null, sourceWalletId, -parseFloat(request.amount));
+                await walletService.updateBalance(null, destWalletId, parseFloat(request.amount));
 
                 // Log Transaction
-                await client.query(
-                    `INSERT INTO transactions (transaction_id, initiator_user_id, source_wallet_id, destination_wallet_id, amount, currency, transaction_type, direction, status, description, created_at)
-                     VALUES ($1, $2, $3, $4, $5, 'CREDITS', 'PAYMENT', 'outgoing', 'SUCCESS', $6, NOW())`,
-                    [uuidv4(), studentUserId, sourceWalletId, destWalletId, request.amount, `Paiement demande: ${request.description}`]
-                );
+                await supabase
+                    .from('transactions')
+                    .insert({
+                        transaction_id: uuidv4(),
+                        initiator_user_id: studentUserId,
+                        source_wallet_id: sourceWalletId,
+                        destination_wallet_id: destWalletId,
+                        amount: request.amount,
+                        currency: 'CREDITS',
+                        transaction_type: 'PAYMENT',
+                        direction: 'outgoing',
+                        status: 'SUCCESS',
+                        description: `Paiement demande: ${request.description}`
+                    });
 
                 // Update Request Status
-                await client.query("UPDATE payment_requests SET status = 'PAID', updated_at = NOW() WHERE request_id = $1", [requestId]);
+                await supabase
+                    .from('payment_requests')
+                    .update({
+                        status: 'PAID',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('request_id', requestId);
 
                 return { status: 'PAID' };
-            });
+            } catch (error) {
+                logger.error('Payment request processing failed', error);
+                throw error;
+            }
         }
     }
 }

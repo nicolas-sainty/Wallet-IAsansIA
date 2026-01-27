@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-const db = require('../config/database');
+const { supabase } = require('../config/database');
 const logger = require('../config/logger');
 
 class WalletService {
@@ -15,13 +15,23 @@ class WalletService {
             const walletId = uuidv4();
             const actualUserId = userId || uuidv4(); // Auto-generate if not provided
 
-            const query = `
-        INSERT INTO wallets (wallet_id, user_id, group_id, currency, balance, status)
-        VALUES ($1, $2, $3, $4, 0.00000000, 'active')
-        RETURNING *
-      `;
+            const { data, error } = await supabase
+                .from('wallets')
+                .insert({
+                    wallet_id: walletId,
+                    user_id: actualUserId,
+                    group_id: groupId,
+                    currency,
+                    balance: 0.00000000,
+                    status: 'active'
+                })
+                .select()
+                .single();
 
-            const result = await db.query(query, [walletId, actualUserId, groupId, currency]);
+            if (error) {
+                logger.error('Error creating wallet', { error: error.message, groupId });
+                throw new Error('Failed to create wallet');
+            }
 
             logger.info('Wallet created', {
                 walletId,
@@ -30,7 +40,7 @@ class WalletService {
                 currency
             });
 
-            return result.rows[0];
+            return data;
         } catch (error) {
             logger.error('Error creating wallet', { error: error.message, groupId });
             throw new Error('Failed to create wallet');
@@ -42,14 +52,24 @@ class WalletService {
      * @param {string} userId 
      */
     async getWalletsByUser(userId) {
-        const { rows } = await db.query(
-            `SELECT w.*, g.group_name 
-             FROM wallets w
-             LEFT JOIN groups g ON w.group_id = g.group_id
-             WHERE w.user_id = $1`,
-            [userId]
-        );
-        return rows;
+        const { data, error } = await supabase
+            .from('wallets')
+            .select(`
+                *,
+                groups:group_id (group_name)
+            `)
+            .eq('user_id', userId);
+
+        if (error) {
+            logger.error('Error fetching user wallets', { error: error.message, userId });
+            return [];
+        }
+
+        // Flatten the groups object
+        return (data || []).map(wallet => ({
+            ...wallet,
+            group_name: wallet.groups?.group_name || null
+        }));
     }
 
     /**
@@ -59,20 +79,24 @@ class WalletService {
      */
     async getWallet(walletId) {
         try {
-            const query = `
-        SELECT w.*, g.group_name 
-        FROM wallets w
-        LEFT JOIN groups g ON w.group_id = g.group_id
-        WHERE w.wallet_id = $1
-      `;
+            const { data, error } = await supabase
+                .from('wallets')
+                .select(`
+                    *,
+                    groups:group_id (group_name)
+                `)
+                .eq('wallet_id', walletId)
+                .single();
 
-            const result = await db.query(query, [walletId]);
-
-            if (result.rows.length === 0) {
+            if (error || !data) {
                 throw new Error('Wallet not found');
             }
 
-            return result.rows[0];
+            // Flatten the groups object
+            return {
+                ...data,
+                group_name: data.groups?.group_name || null
+            };
         } catch (error) {
             logger.error('Error fetching wallet', { error: error.message, walletId });
             throw error;
@@ -86,23 +110,36 @@ class WalletService {
      */
     async getBalance(walletId) {
         try {
-            // Check if view exists, otherwise fallback to manual calc
-            // For now assuming view is migrated. Postgres view names are case sensitive if quoted, usually lowercase is fine.
-            const query = `
-        SELECT * FROM wallet_balances_with_pending 
-        WHERE wallet_id = $1
-      `;
+            // Try to use the view if it exists, otherwise fallback to simple wallet query
+            const { data, error } = await supabase
+                .from('wallet_balances_with_pending')
+                .select('*')
+                .eq('wallet_id', walletId)
+                .single();
 
-            const result = await db.query(query, [walletId]);
+            if (error) {
+                // Fallback: just get the wallet balance
+                const { data: wallet, error: walletError } = await supabase
+                    .from('wallets')
+                    .select('balance')
+                    .eq('wallet_id', walletId)
+                    .single();
 
-            if (result.rows.length === 0) {
-                throw new Error('Wallet not found');
+                if (walletError || !wallet) {
+                    throw new Error('Wallet not found');
+                }
+
+                return {
+                    walletId,
+                    confirmedBalance: parseFloat(wallet.balance),
+                    availableBalance: parseFloat(wallet.balance),
+                };
             }
 
             return {
                 walletId,
-                confirmedBalance: parseFloat(result.rows[0].confirmed_balance),
-                availableBalance: parseFloat(result.rows[0].available_balance),
+                confirmedBalance: parseFloat(data.confirmed_balance),
+                availableBalance: parseFloat(data.available_balance),
             };
         } catch (error) {
             logger.error('Error fetching balance', { error: error.message, walletId });
@@ -112,32 +149,54 @@ class WalletService {
 
     /**
      * Update wallet balance (internal use, typically called during transaction processing)
-     * @param {Object} client - Database client (for transactions)
+     * Note: Supabase doesn't support transactions via JS client, so this is a simple update
+     * For atomic operations, you should use RPC functions
+     * @param {Object} client - Not used with Supabase (kept for compatibility)
      * @param {string} walletId - Wallet ID
      * @param {number} amount - Amount to add (negative to subtract)
      * @returns {Promise<Object>} Updated wallet
      */
     async updateBalance(client, walletId, amount) {
         try {
-            const query = `
-        UPDATE wallets 
-        SET balance = balance + $1, updated_at = NOW()
-        WHERE wallet_id = $2 AND status = 'active'
-        RETURNING *
-      `;
+            // First, get current balance
+            const { data: wallet, error: fetchError } = await supabase
+                .from('wallets')
+                .select('balance, status')
+                .eq('wallet_id', walletId)
+                .single();
 
-            const result = await client.query(query, [amount, walletId]);
-
-            if (result.rows.length === 0) {
+            if (fetchError || !wallet) {
                 throw new Error('Wallet not found or inactive');
             }
 
+            if (wallet.status !== 'active') {
+                throw new Error('Wallet not found or inactive');
+            }
+
+            const newBalance = parseFloat(wallet.balance) + amount;
+
             // Check if balance would go negative
-            if (parseFloat(result.rows[0].balance) < 0) {
+            if (newBalance < 0) {
                 throw new Error('Insufficient funds');
             }
 
-            return result.rows[0];
+            // Update the balance
+            const { data, error } = await supabase
+                .from('wallets')
+                .update({
+                    balance: newBalance,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('wallet_id', walletId)
+                .eq('status', 'active')
+                .select()
+                .single();
+
+            if (error || !data) {
+                throw new Error('Failed to update balance');
+            }
+
+            return data;
         } catch (error) {
             logger.error('Error updating balance', { error: error.message, walletId, amount });
             throw error;
@@ -152,18 +211,23 @@ class WalletService {
      */
     async freezeWallet(walletId, reason) {
         try {
-            const query = `
-        UPDATE wallets 
-        SET status = 'suspended', updated_at = NOW()
-        WHERE wallet_id = $1
-        RETURNING *
-      `;
+            const { data, error } = await supabase
+                .from('wallets')
+                .update({
+                    status: 'suspended',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('wallet_id', walletId)
+                .select()
+                .single();
 
-            const result = await db.query(query, [walletId]);
+            if (error) {
+                throw new Error('Failed to freeze wallet');
+            }
 
             logger.warn('Wallet frozen', { walletId, reason });
 
-            return result.rows[0];
+            return data;
         } catch (error) {
             logger.error('Error freezing wallet', { error: error.message, walletId });
             throw error;
@@ -180,24 +244,24 @@ class WalletService {
         try {
             const { limit = 50, offset = 0, status = null } = options;
 
-            let query = `
-        SELECT * FROM transactions
-        WHERE (source_wallet_id = $1 OR destination_wallet_id = $1)
-      `;
-
-            const params = [walletId];
+            let query = supabase
+                .from('transactions')
+                .select('*')
+                .or(`source_wallet_id.eq.${walletId},destination_wallet_id.eq.${walletId}`)
+                .order('created_at', { ascending: false })
+                .range(offset, offset + limit - 1);
 
             if (status) {
-                query += ` AND status = $${params.length + 1}`;
-                params.push(status);
+                query = query.eq('status', status);
             }
 
-            query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-            params.push(limit, offset);
+            const { data, error } = await query;
 
-            const result = await db.query(query, params);
+            if (error) {
+                throw error;
+            }
 
-            return result.rows;
+            return data || [];
         } catch (error) {
             logger.error('Error fetching transaction history', { error: error.message, walletId });
             throw error;
@@ -211,14 +275,18 @@ class WalletService {
      */
     async getWalletsByGroup(groupId) {
         try {
-            const query = `
-        SELECT * FROM wallets
-        WHERE group_id = $1 AND status = 'active'
-        ORDER BY created_at DESC
-      `;
+            const { data, error } = await supabase
+                .from('wallets')
+                .select('*')
+                .eq('group_id', groupId)
+                .eq('status', 'active')
+                .order('created_at', { ascending: false });
 
-            const result = await db.query(query, [groupId]);
-            return result.rows;
+            if (error) {
+                throw error;
+            }
+
+            return data || [];
         } catch (error) {
             logger.error('Error fetching group wallets', { error: error.message, groupId });
             throw error;

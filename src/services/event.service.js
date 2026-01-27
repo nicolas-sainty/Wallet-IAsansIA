@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
-const db = require('../config/database');
+const { supabase } = require('../config/database');
 
 /**
  * Event Service
@@ -14,11 +14,22 @@ class EventService {
         const eventId = uuidv4();
 
         try {
-            await db.query(
-                `INSERT INTO events (event_id, group_id, title, description, event_date, reward_points, max_participants, status, created_by_user_id, current_participants) 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0)`,
-                [eventId, groupId, title, description, eventDate, rewardPoints, maxParticipants, status, userId]
-            );
+            const { error } = await supabase
+                .from('events')
+                .insert({
+                    event_id: eventId,
+                    group_id: groupId,
+                    title,
+                    description,
+                    event_date: eventDate,
+                    reward_points: rewardPoints,
+                    max_participants: maxParticipants,
+                    status,
+                    created_by_user_id: userId,
+                    current_participants: 0
+                });
+
+            if (error) throw error;
 
             logger.info(`Event created: ${title} (${eventId}) by user ${userId}`);
             return this.getEvent(eventId);
@@ -33,16 +44,23 @@ class EventService {
      */
     async getUpcomingEvents() {
         try {
-            const { rows } = await db.query(
-                `SELECT e.*, g.group_name, u.full_name as creator_name,
-                        e.current_participants, e.max_participants
-                 FROM events e 
-                 LEFT JOIN groups g ON e.group_id = g.group_id
-                 LEFT JOIN users u ON e.created_by_user_id = u.user_id
-                 WHERE e.status IN ('OPEN', 'FULL')
-                 ORDER BY e.event_date ASC`
-            );
-            return rows;
+            const { data, error } = await supabase
+                .from('events')
+                .select(`
+                    *,
+                    groups:group_id (group_name),
+                    users:created_by_user_id (full_name)
+                `)
+                .in('status', ['OPEN', 'FULL'])
+                .order('event_date', { ascending: true });
+
+            if (error) throw error;
+
+            return (data || []).map(event => ({
+                ...event,
+                group_name: event.groups?.group_name || null,
+                creator_name: event.users?.full_name || null
+            }));
         } catch (error) {
             logger.error('Error fetching events:', error);
             throw error;
@@ -53,16 +71,26 @@ class EventService {
      * Get event details
      */
     async getEvent(eventId) {
-        const { rows } = await db.query(
-            `SELECT e.*, g.group_name, u.full_name as creator_name,
-                    e.current_participants, e.max_participants
-             FROM events e
-             LEFT JOIN groups g ON e.group_id = g.group_id
-             LEFT JOIN users u ON e.created_by_user_id = u.user_id
-             WHERE e.event_id = $1`,
-            [eventId]
-        );
-        return rows[0];
+        const { data, error } = await supabase
+            .from('events')
+            .select(`
+                *,
+                groups:group_id (group_name),
+                users:created_by_user_id (full_name)
+            `)
+            .eq('event_id', eventId)
+            .single();
+
+        if (error) {
+            logger.error('Error fetching event:', error);
+            return null;
+        }
+
+        return {
+            ...data,
+            group_name: data.groups?.group_name || null,
+            creator_name: data.users?.full_name || null
+        };
     }
 
     /**
@@ -82,33 +110,51 @@ class EventService {
         }
 
         // Check if already participated
-        const { rows } = await db.query(
-            'SELECT * FROM event_participants WHERE event_id = $1 AND wallet_id = $2',
-            [eventId, walletId]
-        );
+        const { data: existing } = await supabase
+            .from('event_participants')
+            .select('*')
+            .eq('event_id', eventId)
+            .eq('wallet_id', walletId);
 
-        if (rows.length > 0) {
+        if (existing && existing.length > 0) {
             throw new Error('Already registered for this event');
         }
 
         const participantId = uuidv4();
 
-        // Transaction to ensure atomicity
-        return await db.transaction(async (client) => {
-            // Record participation as registered
-            const result = await client.query(
-                `INSERT INTO event_participants (participant_id, event_id, wallet_id, points_earned, status)
-                 VALUES ($1, $2, $3, $4, 'pending')
-                 RETURNING *`,
-                [participantId, eventId, walletId, event.reward_points]
-            );
+        // NOTE: Supabase doesn't support transactions via JS client
+        // This is a simplified version - ideally use an RPC function
+        try {
+            // Record participation as pending
+            const { data, error } = await supabase
+                .from('event_participants')
+                .insert({
+                    participant_id: participantId,
+                    event_id: eventId,
+                    wallet_id: walletId,
+                    points_earned: event.reward_points,
+                    status: 'pending'
+                })
+                .select()
+                .single();
 
-            // Trigger will auto-update current_participants and status to FULL if needed
+            if (error) throw error;
+
+            // Update current_participants count
+            await supabase
+                .from('events')
+                .update({
+                    current_participants: event.current_participants + 1
+                })
+                .eq('event_id', eventId);
 
             logger.info(`Participation registered: Event ${eventId}, Wallet ${walletId}`);
 
-            return result.rows[0];
-        });
+            return data;
+        } catch (error) {
+            logger.error('Error registering participation:', error);
+            throw error;
+        }
     }
 
     /**
@@ -121,58 +167,87 @@ class EventService {
             throw new Error('Invalid status. Must be verified or rejected');
         }
 
-        return await db.transaction(async (client) => {
+        try {
             // 1. Get participation details
-            const { rows } = await client.query(
-                'SELECT * FROM event_participants WHERE participant_id = $1',
-                [participantId]
-            );
-            const participation = rows[0];
+            const { data: participation, error: fetchError } = await supabase
+                .from('event_participants')
+                .select('*')
+                .eq('participant_id', participantId)
+                .single();
 
-            if (!participation) throw new Error('Participation not found');
+            if (fetchError || !participation) throw new Error('Participation not found');
             if (participation.status !== 'pending') throw new Error('Participation already processed');
 
             // 2. Update status
-            await client.query(
-                'UPDATE event_participants SET status = $1 WHERE participant_id = $2',
-                [status, participantId]
-            );
+            await supabase
+                .from('event_participants')
+                .update({ status })
+                .eq('participant_id', participantId);
 
             // 3. If verified, credit wallet
             if (status === 'verified') {
-                await client.query(
-                    'UPDATE wallets SET balance = balance + $1 WHERE wallet_id = $2',
-                    [participation.points_earned, participation.wallet_id]
-                );
+                const { data: wallet } = await supabase
+                    .from('wallets')
+                    .select('balance')
+                    .eq('wallet_id', participation.wallet_id)
+                    .single();
+
+                if (wallet) {
+                    const newBalance = parseFloat(wallet.balance) + parseFloat(participation.points_earned);
+                    await supabase
+                        .from('wallets')
+                        .update({ balance: newBalance })
+                        .eq('wallet_id', participation.wallet_id);
+                }
             }
 
             return { success: true, status };
-        });
+        } catch (error) {
+            logger.error('Error validating participation:', error);
+            throw error;
+        }
     }
 
     /**
      * Get pending participations for a group (or all if groupId is null)
      */
     async getPendingParticipations(groupId = null) {
-        let query = `
-            SELECT ep.*, e.title as event_title, u.full_name as user_name, u.email as user_email
-            FROM event_participants ep
-            JOIN events e ON ep.event_id = e.event_id
-            JOIN wallets w ON ep.wallet_id = w.wallet_id
-            JOIN users u ON w.user_id = u.user_id
-            WHERE ep.status = 'pending'
-        `;
-        const params = [];
+        try {
+            let query = supabase
+                .from('event_participants')
+                .select(`
+                    *,
+                    events:event_id (title, group_id),
+                    wallets:wallet_id (
+                        user_id,
+                        users:user_id (full_name, email)
+                    )
+                `)
+                .eq('status', 'pending')
+                .order('participated_at', { ascending: false });
 
-        if (groupId) {
-            query += ' AND e.group_id = $1';
-            params.push(groupId);
+            const { data, error } = await query;
+
+            if (error) throw error;
+
+            // Filter by group if specified and flatten
+            let results = (data || []).map(ep => ({
+                ...ep,
+                event_title: ep.events?.title || null,
+                event_group_id: ep.events?.group_id || null,
+                user_name: ep.wallets?.users?.full_name || null,
+                user_email: ep.wallets?.users?.email || null
+            }));
+
+            if (groupId) {
+                results = results.filter(r => r.event_group_id === groupId);
+            }
+
+            return results;
+        } catch (error) {
+            logger.error('Error fetching pending participations:', error);
+            throw error;
         }
-
-        query += ' ORDER BY ep.participated_at DESC';
-
-        const { rows } = await db.query(query, params);
-        return rows;
     }
 
     /**
@@ -184,81 +259,104 @@ class EventService {
             throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
         }
 
-        const result = await db.query(
-            'UPDATE events SET status = $1 WHERE event_id = $2 RETURNING *',
-            [newStatus, eventId]
-        );
+        const { data, error } = await supabase
+            .from('events')
+            .update({ status: newStatus })
+            .eq('event_id', eventId)
+            .select()
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error || !data) {
             throw new Error('Event not found');
         }
 
         logger.info(`Event ${eventId} status updated to ${newStatus}`);
-        return result.rows[0];
+        return data;
     }
 
     /**
      * Delete event (admin only)
      */
     async deleteEvent(eventId) {
-        const result = await db.query(
-            'DELETE FROM events WHERE event_id = $1 RETURNING *',
-            [eventId]
-        );
+        const { data, error } = await supabase
+            .from('events')
+            .delete()
+            .eq('event_id', eventId)
+            .select()
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error || !data) {
             throw new Error('Event not found');
         }
 
         logger.info(`Event ${eventId} deleted`);
-        return result.rows[0];
+        return data;
     }
 
     /**
      * Cancel participation
      */
     async cancelParticipation(eventId, walletId) {
-        const result = await db.query(
-            'DELETE FROM event_participants WHERE event_id = $1 AND wallet_id = $2 RETURNING *',
-            [eventId, walletId]
-        );
+        const { data, error } = await supabase
+            .from('event_participants')
+            .delete()
+            .eq('event_id', eventId)
+            .eq('wallet_id', walletId)
+            .select()
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error || !data) {
             throw new Error('Participation not found');
         }
 
         logger.info(`Participation cancelled: Event ${eventId}, Wallet ${walletId}`);
-        return result.rows[0];
+        return data;
     }
 
     /**
      * Get participants for an event
      */
     async getEventParticipants(eventId) {
-        const { rows } = await db.query(
-            `SELECT ep.*, u.full_name, u.email, w.user_id
-             FROM event_participants ep
-             JOIN wallets w ON ep.wallet_id = w.wallet_id
-             JOIN users u ON w.user_id = u.user_id
-             WHERE ep.event_id = $1
-             ORDER BY ep.participated_at DESC`,
-            [eventId]
-        );
-        return rows;
+        const { data, error } = await supabase
+            .from('event_participants')
+            .select(`
+                *,
+                wallets:wallet_id (
+                    user_id,
+                    users:user_id (full_name, email)
+                )
+            `)
+            .eq('event_id', eventId)
+            .order('participated_at', { ascending: false });
+
+        if (error) {
+            logger.error('Error fetching participants:', error);
+            throw error;
+        }
+
+        return (data || []).map(ep => ({
+            ...ep,
+            user_id: ep.wallets?.user_id || null,
+            full_name: ep.wallets?.users?.full_name || null,
+            email: ep.wallets?.users?.email || null
+        }));
     }
 
     /**
      * Check if user is participating
      */
     async isUserParticipating(userId, eventId) {
-        const { rows } = await db.query(
-            `SELECT ep.*
-             FROM event_participants ep
-             JOIN wallets w ON ep.wallet_id = w.wallet_id
-             WHERE w.user_id = $1 AND ep.event_id = $2`,
-            [userId, eventId]
-        );
-        return rows.length > 0;
+        const { data, error } = await supabase
+            .from('event_participants')
+            .select(`
+                *,
+                wallets:wallet_id (user_id)
+            `)
+            .eq('event_id', eventId);
+
+        if (error) return false;
+
+        return (data || []).some(ep => ep.wallets?.user_id === userId);
     }
 }
 
