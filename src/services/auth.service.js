@@ -1,40 +1,19 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
-
-const dbPath = path.join(__dirname, '../../database/epicoin.sqlite');
-const db = new sqlite3.Database(dbPath);
+const db = require('../config/database');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key_change_me';
 const SALT_ROUNDS = 10;
 
-const runQuery = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.run(query, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-};
-
-const getQuery = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.get(query, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
-};
-
 class AuthService {
     async register(email, password, fullName, role = 'student') {
-        // Validation
-        const existing = await getQuery('SELECT user_id FROM users WHERE email = ?', [email]);
-        if (existing) {
+        const queryText = 'SELECT user_id FROM users WHERE email = $1';
+        const { rows } = await db.query(queryText, [email]);
+
+        if (rows.length > 0) {
             throw new Error('Cet email est déjà utilisé.');
         }
 
@@ -43,16 +22,33 @@ class AuthService {
         const verificationToken = uuidv4();
 
         try {
-            await runQuery(
-                `INSERT INTO users (user_id, email, password_hash, full_name, role, verification_token) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [userId, email, hashedPassword, fullName, role, verificationToken]
+            // Get default BDE (first active group) if niet specified
+            let bdeId = null;
+            const bdeResult = await db.query(
+                'SELECT group_id FROM groups WHERE status = $1 LIMIT 1',
+                ['active']
+            );
+            if (bdeResult.rows.length > 0) {
+                bdeId = bdeResult.rows[0].group_id;
+            }
+
+            await db.query(
+                `INSERT INTO users (user_id, email, password_hash, full_name, role, bde_id, verification_token) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [userId, email, hashedPassword, fullName, role, bdeId, verificationToken]
             );
 
             // Send Verification Email
             await emailService.sendVerificationEmail(email, verificationToken);
 
-            logger.info(`User registered: ${email} (${userId})`);
+            // Auto-create Wallet (Default Personal Wallet)
+            await db.query(
+                `INSERT INTO wallets (user_id, balance, currency, status) VALUES ($1, 0, 'CREDITS', 'active')`,
+                [userId]
+            );
+            logger.info(`Wallet created for user: ${userId}`);
+
+            logger.info(`User registered: ${email} (${userId}) with BDE: ${bdeId}`);
 
             return {
                 userId,
@@ -66,7 +62,8 @@ class AuthService {
     }
 
     async login(email, password) {
-        const user = await getQuery('SELECT * FROM users WHERE email = ?', [email]);
+        const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        const user = rows[0];
 
         if (!user) {
             throw new Error('Email ou mot de passe incorrect');
@@ -105,14 +102,15 @@ class AuthService {
     }
 
     async verifyEmail(token) {
-        const user = await getQuery('SELECT * FROM users WHERE verification_token = ?', [token]);
+        const { rows } = await db.query('SELECT * FROM users WHERE verification_token = $1', [token]);
+        const user = rows[0];
 
         if (!user) {
             throw new Error('Token de vérification invalide');
         }
 
-        await runQuery(
-            'UPDATE users SET is_verified = 1, verification_token = NULL WHERE user_id = ?',
+        await db.query(
+            'UPDATE users SET is_verified = 1, verification_token = NULL WHERE user_id = $1',
             [user.user_id]
         );
 
@@ -121,8 +119,8 @@ class AuthService {
     }
 
     async getUserById(userId) {
-        const user = await getQuery('SELECT user_id, email, full_name, role, is_verified, created_at FROM users WHERE user_id = ?', [userId]);
-        return user;
+        const { rows } = await db.query('SELECT user_id, email, full_name, role, is_verified, bde_id, created_at FROM users WHERE user_id = $1', [userId]);
+        return rows[0];
     }
 }
 

@@ -1,210 +1,157 @@
-# Epicoin Exchange System
+# Student Wallet
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue.svg)](https://www.postgresql.org/)
 
-> Système d'échange d'Epicoins entre groupes et communautés - Simple, transparent, équitable
+> Système de wallet étudiant pour gérer des crédits et des paiements au sein d'associations étudiantes
 
-## 🎯 Vision du Projet
-
-Epicoin est une plateforme d'échange de valeur entre communautés indépendantes, basée sur une monnaie interne (Epicoins). Le système permet des échanges inter-groupes sécurisés, traçables et équitables, avec une logique de confiance et de réputation.
-
-### Principes Fondamentaux
-
-- **Simplicité** : Pas ou peu de création de compte, expérience utilisateur fluide
-- **Transparence** : Tous les échanges sont traçables et auditables
-- **Scalabilité** : Support de plusieurs groupes avec volumes variables
-- **Décentralisation** : Architecture semi-décentralisée évitant les dépendances lourdes
-- **Confiance** : Système de réputation basé sur l'historique des transactions
-
-## 🚀 Démarrage Rapide
+## 🚀 Installation Rapide
 
 ### Prérequis
 
-- Node.js 18+ et npm 9+
-- PostgreSQL 14+
+- [Node.js](https://nodejs.org/) 18+ et npm
+- [PostgreSQL](https://www.postgresql.org/) 14+
 - Git
 
-### Installation
+### Setup
 
 ```bash
-# Cloner le repository
+# 1. Cloner le projet
 git clone https://github.com/nicolas-sainty/Wallet-IAsansIA.git
 cd Wallet-IAsansIA
 
-# Installer les dépendances
+# 2. Installer les dépendances
 npm install
 
-# Configurer l'environnement
+# 3. Configurer l'environnement
 cp .env.example .env
-# Éditer .env avec vos paramètres
+# Éditer .env avec vos paramètres PostgreSQL
 
-# Initialiser la base de données
-psql -U postgres -c "CREATE DATABASE epicoin_db;"
-psql -U postgres -d epicoin_db -f database/schema.sql
+# 4. Créer la base de données
+psql -U postgres -c "CREATE DATABASE student_wallet_db;"
+psql -U postgres -d student_wallet_db -f database/schema.sql
 
-# Démarrer le serveur
+# 5. Démarrer l'application
 npm run dev
 ```
 
-L'application sera accessible sur `http://localhost:3000`
+L'application sera accessible sur **http://localhost:3000** 🎉
 
-## 📁 Architecture du Projet
+## 🔧 Configuration
+
+### Fichier `.env`
+
+```env
+# Database
+DB_USER=postgres
+DB_HOST=localhost
+DB_DATABASE=student_wallet_db
+DB_PASSWORD=your_password
+DB_PORT=5432
+
+# Server
+PORT=3000
+NODE_ENV=development
+```
+
+## 📁 Structure du Projet
 
 ```
 Wallet-IAsansIA/
 ├── database/
-│   └── schema.sql           # Schéma PostgreSQL complet
+│   └── schema.sql           # Schéma de la base de données
 ├── public/
-│   ├── css/
-│   │   └── index.css        # Styles modernes avec glassmorphism
-│   ├── js/
-│   │   └── app.js           # Logique frontend
-│   └── index.html           # Interface utilisateur
+│   ├── css/                 # Styles CSS
+│   ├── js/                  # Scripts frontend
+│   ├── index.html           # Page principale
+│   ├── shop.html            # Boutique de crédits
+│   ├── events.html          # Événements
+│   ├── profile.html         # Profil utilisateur
+│   └── login.html           # Authentification
 ├── src/
 │   ├── api/
-│   │   └── server.js        # Serveur Express principal
+│   │   └── server.js        # Serveur Express
 │   ├── config/
 │   │   ├── database.js      # Configuration PostgreSQL
-│   │   └── logger.js        # Winston logger
+│   │   └── logger.js        # Logger Winston
 │   ├── routes/
+│   │   ├── auth.routes.js
 │   │   ├── wallets.routes.js
-│   │   ├── transactions.routes.js
-│   │   └── groups.routes.js
+│   │   ├── payment.routes.js
+│   │   └── transactions.routes.js
 │   └── services/
+│       ├── auth.service.js
 │       ├── wallet.service.js
-│       ├── transaction.service.js
-│       └── group.service.js
-├── .env.example             # Template de configuration
-├── package.json
-└── README.md
+│       ├── payment.service.js
+│       └── transaction.service.js
+└── package.json
 ```
 
-## 🔧 API Endpoints
+## 🎯 Fonctionnalités
 
-### Wallets
+- ✅ **Authentification** : Inscription et connexion sécurisées
+- ✅ **Wallets** : Gestion de wallets multi-devises (CREDITS, EUR)
+- ✅ **Achats de crédits** : Simulation d'achat avec packs prédéfinis
+- ✅ **Transactions** : Historique complet des transactions
+- ✅ **Profil utilisateur** : Gestion du compte et des informations
 
-- `POST /api/wallets` - Créer un wallet
-- `GET /api/wallets/:walletId` - Détails d'un wallet
-- `GET /api/wallets/:walletId/balance` - Solde du wallet
-- `GET /api/wallets/:walletId/transactions` - Historique des transactions
+## 🎨 Interface
 
-### Transactions
-
-- `POST /api/transactions` - Initier une transaction
-- `GET /api/transactions/:txId` - Détails de la transaction
-- `GET /api/transactions/:txId/status` - Statut de la transaction
-- `POST /api/transactions/:txId/cancel` - Annuler une transaction (si PENDING)
-
-### Groupes
-
-- `POST /api/groups` - Créer un groupe
-- `GET /api/groups` - Liste tous les groupes
-- `GET /api/groups/:groupId` - Détails d'un groupe
-- `GET /api/groups/:groupId/members` - Membres du groupe
-- `GET /api/groups/:groupId/stats` - Statistiques du groupe
-- `POST /api/groups/:groupId/rules` - Définir règles d'échange
-- `GET /api/groups/:groupId/trust-scores` - Scores de confiance
-
-## 💾 Modèle de Données
-
-### Transactions
-
-Chaque transaction contient :
-
-- **Identifiants** : `transaction_id`, `provider`, `provider_tx_id`
-- **Acteurs** : `initiator_user_id`, `source_wallet_id`, `destination_wallet_id`
-- **Données financières** : `amount`, `currency`
-- **Type** : `transaction_type` (P2P, MERCHANT, CASHIN, CASHOUT)
-- **Statut** : `status` (PENDING, SUCCESS, FAILED, CANCELED)
-- **Timestamps** : `created_at`, `executed_at`, `provider_created_at`
-- **Métadonnées** : `description`, `country`, `city`, `metadata`
-
-### Système de Confiance
-
-Le score de confiance entre groupes est calculé automatiquement basé sur :
-- Nombre de transactions réussies
-- Volume total échangé
-- Taux d'échec
-- Ancienneté de la relation
-
-## 🎨 Interface Utilisateur
-
-L'interface web présente :
-
-- **Dashboard** : Vue d'ensemble avec statistiques en temps réel
-- **Wallets** : Gestion des wallets avec création en un clic
-- **Transferts** : Interface simple pour envoyer des Epicoins
-- **Historique** : Liste complète et filtrable des transactions
-- **Groupes** : Vue des communautés avec scores de confiance
-
-### Design
-
-- Mode sombre par défaut avec support du mode clair
-- Glassmorphism et gradients modernes
-- Animations fluides et micro-interactions
-- Responsive design pour mobile et desktop
-- Typographie premium (Inter font)
+L'interface utilise un design moderne avec :
+- Mode sombre avec palette navy blue, bright blue, coral orange et cream
+- Glassmorphism et effets de transparence
+- Animations fluides
+- Interface responsive mobile-first
 
 ## 🔒 Sécurité
 
-- Helmet.js pour les en-têtes HTTP sécurisés
-- Rate limiting sur les endpoints API
-- Validation des entrées avec express-validator
-- Transactions atomiques PostgreSQL
-- Logging complet des actions
+- Mots de passe hashés avec bcrypt
+- Sessions sécurisées
+- Validation des entrées
+- Protection CORS
+- Logging des événements
 
-## 🧪 Tests
+## 📝 API Endpoints
 
+### Authentication
+- `POST /api/auth/register` - Créer un compte
+- `POST /api/auth/login` - Se connecter
+- `POST /api/auth/logout` - Se déconnecter
+
+### Wallets
+- `GET /api/wallets/user/:userId` - Wallets d'un utilisateur
+- `GET /api/wallets/:walletId/transactions` - Historique des transactions
+
+### Payment
+- `POST /api/payment/simulate` - Simuler un achat de crédits
+
+## 🐛 Dépannage
+
+### La base de données ne se connecte pas
+- Vérifiez que PostgreSQL est démarré
+- Vérifiez les identifiants dans `.env`
+- Vérifiez que la base de données existe
+
+### Erreur au démarrage du serveur
 ```bash
-# Tests unitaires
-npm test
-
-# Tests d'intégration
-npm run test:integration
-
-# Coverage
-npm test -- --coverage
+# Vérifier que le port 3000 n'est pas déjà utilisé
+netstat -ano | findstr :3000  # Windows
+lsof -i :3000                 # Mac/Linux
 ```
 
-## 📈 Monitoring
-
-Les logs sont stockés dans `logs/` :
-- `error.log` : Erreurs uniquement
-- `combined.log` : Tous les événements
-
-Endpoint de santé : `GET /health`
-
-## 🤝 Contribution
-
-Ce projet est en phase de co-construction. Nous cherchons à échanger avec d'autres groupes intéressés par :
-
-- Les monnaies communautaires
-- Les systèmes d'échange alternatifs
-- Les mécanismes d'incitation inter-communautés
-
-### Roadmap
-
-- [ ] Support multi-devises (conversion Epicoin ↔ Fiat/Crypto)
-- [ ] Intégration de providers de paiement externes
-- [ ] Application mobile (React Native)
-- [ ] Smart contracts pour décentralisation accrue
-- [ ] Dashboard analytics avancé
-- [ ] API GraphQL
+### Les transactions ne fonctionnent pas
+- Assurez-vous que le schéma SQL est bien appliqué
+- Vérifiez les logs dans `logs/error.log`
 
 ## 📄 License
 
-MIT License - voir le fichier LICENSE pour plus de détails
+MIT License - Voir le fichier LICENSE pour plus de détails
 
-## 👥 Auteurs
+## 👥 Contribution
 
-Projet développé par la communauté Epicoin
-
-## 📮 Contact
-
-Pour toute question ou collaboration : [GitHub Issues](https://github.com/nicolas-sainty/Wallet-IAsansIA/issues)
+Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
 
 ---
 
-**Note** : Ce projet est en développement actif. Les contributions et feedbacks sont les bienvenus !
+**Développé avec ❤️ pour les associations étudiantes**

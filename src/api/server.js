@@ -11,6 +11,7 @@ const transactionsRoutes = require('../routes/transactions.routes');
 const groupsRoutes = require('../routes/groups.routes');
 const eventsRoutes = require('../routes/events.routes');
 const authRoutes = require('../routes/auth.routes');
+const paymentRoutes = require('../routes/payment.routes');
 const webhookRoutes = require('../routes/webhooks.routes');
 
 const app = express();
@@ -89,6 +90,7 @@ app.use('/api/transactions', transactionsRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/payment', paymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // Static files (frontend)

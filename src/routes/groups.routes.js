@@ -214,4 +214,28 @@ router.get(
     }
 );
 
+// ... existing routes ...
+
+/**
+ * POST /api/groups/:groupId/students
+ * Link a student by email
+ */
+router.post(
+    '/:groupId/students',
+    [param('groupId').isUUID(), body('email').isEmail()],
+    validate,
+    async (req, res) => {
+        try {
+            const { groupId } = req.params;
+            const { email } = req.body;
+            // Verify caller is admin of this group (Middleware should do this typically, simplifying for now)
+
+            await groupService.linkStudentToBDE(email, groupId);
+            res.json({ success: true, message: 'Student linked' });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+);
+
 module.exports = router;

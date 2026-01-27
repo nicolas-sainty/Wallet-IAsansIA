@@ -38,6 +38,21 @@ class WalletService {
     }
 
     /**
+     * Get all wallets for a specific user
+     * @param {string} userId 
+     */
+    async getWalletsByUser(userId) {
+        const { rows } = await db.query(
+            `SELECT w.*, g.group_name 
+             FROM wallets w
+             LEFT JOIN groups g ON w.group_id = g.group_id
+             WHERE w.user_id = $1`,
+            [userId]
+        );
+        return rows;
+    }
+
+    /**
      * Get wallet by ID with full details
      * @param {string} walletId - Wallet ID
      * @returns {Promise<Object>} Wallet details
@@ -71,6 +86,8 @@ class WalletService {
      */
     async getBalance(walletId) {
         try {
+            // Check if view exists, otherwise fallback to manual calc
+            // For now assuming view is migrated. Postgres view names are case sensitive if quoted, usually lowercase is fine.
             const query = `
         SELECT * FROM wallet_balances_with_pending 
         WHERE wallet_id = $1

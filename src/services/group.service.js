@@ -27,6 +27,13 @@ class GroupService {
                 JSON.stringify(settings),
             ]);
 
+            // Create BDE Wallet (EUR)
+            await db.query(
+                `INSERT INTO wallets (wallet_id, user_id, group_id, currency, balance, status)
+                 VALUES ($1, $2, $3, 'EUR', 0.00000000, 'active')`,
+                [uuidv4(), adminUserId, groupId]
+            );
+
             logger.info('Group created', { groupId, groupName, adminUserId });
 
             return result.rows[0];
@@ -229,9 +236,12 @@ class GroupService {
             const query = `
         SELECT 
           w.*,
+          u.email,
+          u.full_name,
           (SELECT COUNT(*) FROM transactions 
            WHERE source_wallet_id = w.wallet_id OR destination_wallet_id = w.wallet_id) as transaction_count
         FROM wallets w
+        JOIN users u ON w.user_id = u.user_id
         WHERE w.group_id = $1 AND w.status = 'active'
         ORDER BY w.created_at DESC
       `;
@@ -242,6 +252,40 @@ class GroupService {
             logger.error('Error fetching group members', { error: error.message, groupId });
             throw error;
         }
+    }
+
+    /**
+     * Link a student to a BDE Group
+     */
+    async linkStudentToBDE(email, bdeGroupId) {
+        // Find user by email
+        const userRes = await db.query("SELECT user_id FROM users WHERE email = $1", [email]);
+        if (userRes.rows.length === 0) {
+            throw new Error("Student email not found");
+        }
+        const userId = userRes.rows[0].user_id;
+
+        // Update User
+        await db.query("UPDATE users SET bde_id = $1 WHERE user_id = $2", [bdeGroupId, userId]);
+
+        // Ensure User has a CREDITS wallet (Student Wallet)
+        // Check current wallets
+        const wRes = await db.query("SELECT * FROM wallets WHERE user_id = $1 AND currency = 'CREDITS'", [userId]);
+        if (wRes.rows.length === 0) {
+            // Create CREDITS wallet
+            const walletId = uuidv4();
+            await db.query(
+                `INSERT INTO wallets (wallet_id, user_id, group_id, currency, balance, status)
+                 VALUES ($1, $2, $3, 'CREDITS', 0.00, 'active')`,
+                [walletId, userId, bdeGroupId]
+            );
+        } else {
+            // Update group_id of existing wallet if different?
+            // Usually we might want to keep history, but for simplicity let's update group link
+            await db.query("UPDATE wallets SET group_id = $1 WHERE user_id = $2 AND currency = 'CREDITS'", [bdeGroupId, userId]);
+        }
+
+        return { userId, bdeGroupId };
     }
 }
 

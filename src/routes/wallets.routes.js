@@ -21,26 +21,40 @@ const validate = (req, res, next) => {
 router.post(
     '/',
     [
-        body('groupId').isUUID().withMessage('Valid group ID required'),
-        body('userId').optional().isUUID().withMessage('User ID must be valid UUID'),
+        body('groupId').optional().isUUID(), // Made optional as per rework
+        body('userId').optional().isUUID(),
         body('currency').optional().isLength({ min: 3, max: 10 }),
     ],
     validate,
     async (req, res) => {
         try {
             const { groupId, userId, currency } = req.body;
+            // logic ...
             const wallet = await walletService.createWallet(userId, groupId, currency);
 
-            res.status(201).json({
-                success: true,
-                data: wallet,
-            });
+            res.status(201).json({ success: true, data: wallet });
         } catch (error) {
             logger.error('Wallet creation failed', { error: error.message });
-            res.status(500).json({
-                success: false,
-                error: error.message,
-            });
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+);
+
+/**
+ * GET /api/wallets
+ * Get wallets (filter by userId)
+ */
+router.get(
+    '/',
+    [query('userId').isUUID().withMessage('User ID is required')],
+    validate,
+    async (req, res) => {
+        try {
+            const { userId } = req.query;
+            const wallets = await walletService.getWalletsByUser(userId);
+            res.json({ success: true, data: wallets });
+        } catch (error) {
+            res.status(500).json({ success: false, error: error.message });
         }
     }
 );

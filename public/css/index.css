@@ -3,41 +3,35 @@
    ======================================== */
 
 :root {
-  /* Color Palette Extraction */
-  --color-deep-blue: #0014a8;
-  /* Top Bar */
+  /* Color Palette - Exact Match */
+  --color-navy-blue: #0014a8;
   --color-bright-blue: #0066ff;
-  /* Second Bar */
-  --color-orange: #ff8c42;
-  /* Third Bar */
+  --color-coral-orange: #ff8c42;
   --color-cream: #f9f9e0;
-  /* Bottom Bar */
 
   /* Theme Mapping */
-  --bg-primary: #000a3d;
-  /* Darker version of deep blue for main bg */
-  --bg-secondary: #0014a8;
-  /* Deep Blue */
-  --bg-tertiary: #1a45ba;
-  /* Lighter mix */
+  --bg-primary: #001166;
+  /* Darker navy for main background */
+  --bg-secondary: var(--color-navy-blue);
+  --bg-tertiary: #1a3db8;
 
   --text-primary: var(--color-cream);
-  --text-secondary: rgba(249, 249, 224, 0.7);
+  --text-secondary: rgba(249, 249, 224, 0.75);
   --text-muted: rgba(249, 249, 224, 0.5);
 
   /* Accents */
-  --accent-action: var(--color-orange);
-  /* Buttons */
+  --accent-action: var(--color-coral-orange);
   --accent-highlight: var(--color-bright-blue);
+  --primary-color: var(--color-coral-orange);
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, var(--color-bright-blue) 0%, var(--color-deep-blue) 100%);
-  --gradient-secondary: linear-gradient(135deg, var(--color-orange) 0%, #ff5e00 100%);
-  --gradient-card: linear-gradient(145deg, rgba(0, 102, 255, 0.1), rgba(0, 20, 168, 0.2));
+  --gradient-primary: linear-gradient(135deg, var(--color-bright-blue) 0%, var(--color-navy-blue) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--color-coral-orange) 0%, #ff6b2c 100%);
+  --gradient-card: linear-gradient(145deg, rgba(0, 102, 255, 0.15), rgba(0, 20, 168, 0.25));
 
   --glass-bg: rgba(0, 20, 168, 0.4);
-  --glass-border: rgba(249, 249, 224, 0.1);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  --glass-border: rgba(249, 249, 224, 0.15);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
 
   --radius-sm: 8px;
   --radius-md: 16px;
