@@ -79,13 +79,19 @@
         // but admin.js only calls loadStudents if 'studentsList' element exists.
         // We can manually call it if we need it, or add a hidden trigger.
         document.addEventListener("DOMContentLoaded", () => {
-            // Admin.js handles checks. We need to make sure 'loadStudents' is called for the select dropdown.
-            // But loadStudents writes to 'studentsList'. We don't have that element here.
-            // We should decouple.
-            // Quick fix: Add dummy element or update admin.js to check for select too.
-            if (window.loadStudents && document.getElementById('paymentTargetStudent')) {
-                window.loadStudents();
-            }
+            // Wait for admin.js to initialize currentBdeId
+            const checkInit = setInterval(() => {
+                if (window.currentBdeId) {
+                    clearInterval(checkInit);
+                    if (window.loadStudents && document.getElementById('paymentTargetStudent')) {
+                        console.log("Calling manual loadStudents for Finances page");
+                        window.loadStudents();
+                    }
+                }
+            }, 500);
+
+            // Timeout safety
+            setTimeout(() => clearInterval(checkInit), 10000);
         });
     </script>
 </body>

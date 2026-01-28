@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-const db = require('../config/database');
+const { supabase } = require('../config/database');
 const logger = require('../config/logger');
 
 class GroupService {
@@ -14,29 +14,37 @@ class GroupService {
         try {
             const groupId = uuidv4();
 
-            const query = `
-        INSERT INTO groups (group_id, group_name, admin_user_id, settings, status)
-        VALUES ($1, $2, $3, $4, 'active')
-        RETURNING *
-      `;
+            const { data: group, error: groupError } = await supabase
+                .from('groups')
+                .insert({
+                    group_id: groupId,
+                    group_name: groupName,
+                    admin_user_id: adminUserId,
+                    settings: JSON.stringify(settings),
+                    status: 'active'
+                })
+                .select()
+                .single();
 
-            const result = await db.query(query, [
-                groupId,
-                groupName,
-                adminUserId,
-                JSON.stringify(settings),
-            ]);
+            if (groupError) {
+                throw groupError;
+            }
 
             // Create BDE Wallet (EUR)
-            await db.query(
-                `INSERT INTO wallets (wallet_id, user_id, group_id, currency, balance, status)
-                 VALUES ($1, $2, $3, 'EUR', 0.00000000, 'active')`,
-                [uuidv4(), adminUserId, groupId]
-            );
+            await supabase
+                .from('wallets')
+                .insert({
+                    wallet_id: uuidv4(),
+                    user_id: adminUserId,
+                    group_id: groupId,
+                    currency: 'EUR',
+                    balance: 0.00000000,
+                    status: 'active'
+                });
 
             logger.info('Group created', { groupId, groupName, adminUserId });
 
-            return result.rows[0];
+            return group;
         } catch (error) {
             logger.error('Error creating group', { error: error.message, groupName });
             throw error;
@@ -50,14 +58,17 @@ class GroupService {
      */
     async getGroup(groupId) {
         try {
-            const query = 'SELECT * FROM groups WHERE group_id = $1';
-            const result = await db.query(query, [groupId]);
+            const { data, error } = await supabase
+                .from('groups')
+                .select('*')
+                .eq('group_id', groupId)
+                .single();
 
-            if (result.rows.length === 0) {
+            if (error || !data) {
                 throw new Error('Group not found');
             }
 
-            return result.rows[0];
+            return data;
         } catch (error) {
             logger.error('Error fetching group', { error: error.message, groupId });
             throw error;
@@ -70,16 +81,33 @@ class GroupService {
      */
     async getAllGroups() {
         try {
-            const query = `
-        SELECT g.*, 
-          (SELECT COUNT(*) FROM wallets w WHERE w.group_id = g.group_id) as wallet_count
-        FROM groups g 
-        WHERE status = 'active' 
-        ORDER BY created_at DESC
-      `;
+            // Get all active groups
+            const { data: groups, error: groupsError } = await supabase
+                .from('groups')
+                .select('*')
+                .eq('status', 'active')
+                .order('created_at', { ascending: false });
 
-            const result = await db.query(query);
-            return result.rows;
+            if (groupsError) {
+                throw groupsError;
+            }
+
+            // For each group, count wallets
+            const groupsWithCounts = await Promise.all(
+                (groups || []).map(async (group) => {
+                    const { count } = await supabase
+                        .from('wallets')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('group_id', group.group_id);
+
+                    return {
+                        ...group,
+                        wallet_count: count || 0
+                    };
+                })
+            );
+
+            return groupsWithCounts;
         } catch (error) {
             logger.error('Error fetching groups', { error: error.message });
             throw error;
@@ -105,36 +133,58 @@ class GroupService {
 
             const ruleId = uuidv4();
 
-            const query = `
-        INSERT INTO exchange_rules (
-          rule_id, from_group_id, to_group_id, max_transaction_amount,
-          daily_limit, requires_approval, commission_rate, active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT (from_group_id, to_group_id)
-        DO UPDATE SET
-          max_transaction_amount = $4,
-          daily_limit = $5,
-          requires_approval = $6,
-          commission_rate = $7,
-          active = $8,
-          updated_at = NOW()
-        RETURNING *
-      `;
+            // Check if rule exists
+            const { data: existing } = await supabase
+                .from('exchange_rules')
+                .select('rule_id')
+                .eq('from_group_id', fromGroupId)
+                .eq('to_group_id', toGroupId)
+                .single();
 
-            const result = await db.query(query, [
-                ruleId,
-                fromGroupId,
-                toGroupId,
-                maxTransactionAmount,
-                dailyLimit,
-                requiresApproval,
-                commissionRate,
-                active,
-            ]);
+            let result;
+            if (existing) {
+                // Update existing rule
+                const { data, error } = await supabase
+                    .from('exchange_rules')
+                    .update({
+                        max_transaction_amount: maxTransactionAmount,
+                        daily_limit: dailyLimit,
+                        requires_approval: requiresApproval,
+                        commission_rate: commissionRate,
+                        active,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('from_group_id', fromGroupId)
+                    .eq('to_group_id', toGroupId)
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                result = data;
+            } else {
+                // Insert new rule
+                const { data, error } = await supabase
+                    .from('exchange_rules')
+                    .insert({
+                        rule_id: ruleId,
+                        from_group_id: fromGroupId,
+                        to_group_id: toGroupId,
+                        max_transaction_amount: maxTransactionAmount,
+                        daily_limit: dailyLimit,
+                        requires_approval: requiresApproval,
+                        commission_rate: commissionRate,
+                        active
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                result = data;
+            }
 
             logger.info('Exchange rules set', { fromGroupId, toGroupId, rules });
 
-            return result.rows[0];
+            return result;
         } catch (error) {
             logger.error('Error setting exchange rules', {
                 error: error.message,
@@ -153,13 +203,18 @@ class GroupService {
      */
     async getExchangeRules(fromGroupId, toGroupId) {
         try {
-            const query = `
-        SELECT * FROM exchange_rules
-        WHERE from_group_id = $1 AND to_group_id = $2
-      `;
+            const { data, error } = await supabase
+                .from('exchange_rules')
+                .select('*')
+                .eq('from_group_id', fromGroupId)
+                .eq('to_group_id', toGroupId)
+                .single();
 
-            const result = await db.query(query, [fromGroupId, toGroupId]);
-            return result.rows.length > 0 ? result.rows[0] : null;
+            if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+                throw error;
+            }
+
+            return data || null;
         } catch (error) {
             logger.error('Error fetching exchange rules', {
                 error: error.message,
@@ -177,18 +232,24 @@ class GroupService {
      */
     async getTrustScores(groupId) {
         try {
-            const query = `
-        SELECT 
-          gts.*,
-          g.group_name as partner_group_name
-        FROM group_trust_scores gts
-        JOIN groups g ON g.group_id = gts.to_group_id
-        WHERE gts.from_group_id = $1
-        ORDER BY gts.trust_score DESC
-      `;
+            const { data, error } = await supabase
+                .from('group_trust_scores')
+                .select(`
+                    *,
+                    groups:to_group_id (group_name)
+                `)
+                .eq('from_group_id', groupId)
+                .order('trust_score', { ascending: false });
 
-            const result = await db.query(query, [groupId]);
-            return result.rows;
+            if (error) {
+                throw error;
+            }
+
+            // Flatten the groups object
+            return (data || []).map(score => ({
+                ...score,
+                partner_group_name: score.groups?.group_name || null
+            }));
         } catch (error) {
             logger.error('Error fetching trust scores', { error: error.message, groupId });
             throw error;
@@ -202,27 +263,65 @@ class GroupService {
      */
     async getGroupStats(groupId) {
         try {
-            const query = `
-        SELECT * FROM group_transaction_stats
-        WHERE group_id = $1
-      `;
+            // 1. Count Members (Active wallets in group with user_id)
+            const { count: memberCount, data: wallets, error: walletError } = await supabase
+                .from('wallets')
+                .select('wallet_id', { count: 'exact' })
+                .eq('group_id', groupId)
+                .neq('user_id', null)
+                .eq('status', 'active');
 
-            const result = await db.query(query, [groupId]);
+            if (walletError) throw walletError;
 
-            if (result.rows.length === 0) {
-                return {
-                    groupId,
-                    totalWallets: 0,
-                    totalTransactions: 0,
-                    totalVolume: 0,
-                    avgTransactionAmount: 0,
-                };
+            // 2. Calculate Volume & Transactions (if wallets exist)
+            let totalVolume = 0;
+            let totalTransactions = 0;
+
+            if (wallets && wallets.length > 0) {
+                const walletIds = wallets.map(w => w.wallet_id);
+
+                // Fetch transactions where source OR dest is in walletIds
+                // Note: 'in' filter with OR logic is tricky in one go if checking both columns.
+                // We'll simplify: Fetch transactions where destination is in group (Incoming/Internal)
+                // OR source is in group (Outgoing/Internal).
+                // For "Volume", we might just sum all amounts.
+
+                // Using a simplified approach: Sum 'CREDITS' transactions for these wallets
+                // We'll fetch relevant transactions. LIMIT to 1000 for performance if needed, or use RPC if available.
+                // client-side aggregation for now (assuming not huge history yet).
+
+                const { data: txs, error: txError } = await supabase
+                    .from('transactions')
+                    .select('amount')
+                    .or(`source_wallet_id.in.(${walletIds.join(',')}),destination_wallet_id.in.(${walletIds.join(',')})`)
+                    .eq('currency', 'CREDITS');
+
+                if (!txError && txs) {
+                    totalTransactions = txs.length;
+                    totalVolume = txs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+                }
             }
 
-            return result.rows[0];
+            return {
+                groupId,
+                total_members: memberCount || 0,
+                totalWallets: memberCount || 0, // Alias
+                totalTransactions,
+                totalVolume,
+                avgTransactionAmount: totalTransactions > 0 ? (totalVolume / totalTransactions) : 0,
+            };
+
         } catch (error) {
-            logger.error('Error fetching group stats', { error: error.message, groupId });
-            throw error;
+            logger.error('Error calculating group stats', { error: error.message, groupId });
+            // Return zeros on error to prevent crash
+            return {
+                groupId,
+                total_members: 0,
+                totalWallets: 0,
+                totalTransactions: 0,
+                totalVolume: 0,
+                avgTransactionAmount: 0,
+            };
         }
     }
 
@@ -233,21 +332,60 @@ class GroupService {
      */
     async getGroupMembers(groupId) {
         try {
-            const query = `
-        SELECT 
-          w.*,
-          u.email,
-          u.full_name,
-          (SELECT COUNT(*) FROM transactions 
-           WHERE source_wallet_id = w.wallet_id OR destination_wallet_id = w.wallet_id) as transaction_count
-        FROM wallets w
-        JOIN users u ON w.user_id = u.user_id
-        WHERE w.group_id = $1 AND w.status = 'active'
-        ORDER BY w.created_at DESC
-      `;
+            // Step 1: Fetch wallets
+            const { data: wallets, error } = await supabase
+                .from('wallets')
+                .select('*')
+                .eq('group_id', groupId)
+                .eq('status', 'active')
+                .order('created_at', { ascending: false });
 
-            const result = await db.query(query, [groupId]);
-            return result.rows;
+            if (error) {
+                throw error;
+            }
+
+            if (!wallets || wallets.length === 0) {
+                return [];
+            }
+
+            // Step 2: Fetch Users
+            const userIds = [...new Set(wallets.map(w => w.user_id).filter(id => id))];
+            let userMap = {};
+
+            if (userIds.length > 0) {
+                const { data: users, error: userError } = await supabase
+                    .from('users')
+                    .select('user_id, email, full_name')
+                    .in('user_id', userIds);
+
+                if (!userError && users) {
+                    userMap = users.reduce((acc, u) => {
+                        acc[u.user_id] = u;
+                        return acc;
+                    }, {});
+                }
+            }
+
+            // Step 3: For each wallet, count transactions and attach user info
+            const walletsWithCounts = await Promise.all(
+                (wallets || []).map(async (wallet) => {
+                    const user = userMap[wallet.user_id] || {};
+
+                    const { count } = await supabase
+                        .from('transactions')
+                        .select('*', { count: 'exact', head: true })
+                        .or(`source_wallet_id.eq.${wallet.wallet_id},destination_wallet_id.eq.${wallet.wallet_id}`);
+
+                    return {
+                        ...wallet,
+                        email: user.email || null,
+                        full_name: user.full_name || null,
+                        transaction_count: count || 0
+                    };
+                })
+            );
+
+            return walletsWithCounts;
         } catch (error) {
             logger.error('Error fetching group members', { error: error.message, groupId });
             throw error;
@@ -259,30 +397,50 @@ class GroupService {
      */
     async linkStudentToBDE(email, bdeGroupId) {
         // Find user by email
-        const userRes = await db.query("SELECT user_id FROM users WHERE email = $1", [email]);
-        if (userRes.rows.length === 0) {
+        const { data: users, error: userError } = await supabase
+            .from('users')
+            .select('user_id')
+            .eq('email', email);
+
+        if (userError || !users || users.length === 0) {
             throw new Error("Student email not found");
         }
-        const userId = userRes.rows[0].user_id;
+
+        const userId = users[0].user_id;
 
         // Update User
-        await db.query("UPDATE users SET bde_id = $1 WHERE user_id = $2", [bdeGroupId, userId]);
+        await supabase
+            .from('users')
+            .update({ bde_id: bdeGroupId })
+            .eq('user_id', userId);
 
-        // Ensure User has a CREDITS wallet (Student Wallet)
-        // Check current wallets
-        const wRes = await db.query("SELECT * FROM wallets WHERE user_id = $1 AND currency = 'CREDITS'", [userId]);
-        if (wRes.rows.length === 0) {
+        // Ensure User has a CREDITS wallet
+        const { data: existingWallets } = await supabase
+            .from('wallets')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('currency', 'CREDITS');
+
+        if (!existingWallets || existingWallets.length === 0) {
             // Create CREDITS wallet
             const walletId = uuidv4();
-            await db.query(
-                `INSERT INTO wallets (wallet_id, user_id, group_id, currency, balance, status)
-                 VALUES ($1, $2, $3, 'CREDITS', 0.00, 'active')`,
-                [walletId, userId, bdeGroupId]
-            );
+            await supabase
+                .from('wallets')
+                .insert({
+                    wallet_id: walletId,
+                    user_id: userId,
+                    group_id: bdeGroupId,
+                    currency: 'CREDITS',
+                    balance: 0.00,
+                    status: 'active'
+                });
         } else {
-            // Update group_id of existing wallet if different?
-            // Usually we might want to keep history, but for simplicity let's update group link
-            await db.query("UPDATE wallets SET group_id = $1 WHERE user_id = $2 AND currency = 'CREDITS'", [bdeGroupId, userId]);
+            // Update group_id of existing wallet
+            await supabase
+                .from('wallets')
+                .update({ group_id: bdeGroupId })
+                .eq('user_id', userId)
+                .eq('currency', 'CREDITS');
         }
 
         return { userId, bdeGroupId };

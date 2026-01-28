@@ -158,17 +158,19 @@ router.post('/:id/participate', requireAuth, async (req, res) => {
         const eventId = req.params.id;
 
         // Get user's wallet
-        const db = require('../config/database');
-        const walletResult = await db.query(
-            'SELECT wallet_id FROM wallets WHERE user_id = $1 AND currency = $2 LIMIT 1',
-            [userId, 'CREDITS']
-        );
+        const { supabase } = require('../config/database');
+        const { data: wallets } = await supabase
+            .from('wallets')
+            .select('wallet_id')
+            .eq('user_id', userId)
+            .eq('currency', 'CREDITS')
+            .limit(1);
 
-        if (walletResult.rows.length === 0) {
+        if (!wallets || wallets.length === 0) {
             return res.status(404).json({ error: 'Wallet not found' });
         }
 
-        const walletId = walletResult.rows[0].wallet_id;
+        const walletId = wallets[0].wallet_id;
         const participation = await eventService.participate(eventId, walletId);
 
         res.json({
@@ -192,17 +194,19 @@ router.delete('/:id/participate', requireAuth, async (req, res) => {
         const eventId = req.params.id;
 
         // Get user's wallet
-        const db = require('../config/database');
-        const walletResult = await db.query(
-            'SELECT wallet_id FROM wallets WHERE user_id = $1 AND currency = $2 LIMIT 1',
-            [userId, 'CREDITS']
-        );
+        const { supabase } = require('../config/database');
+        const { data: wallets } = await supabase
+            .from('wallets')
+            .select('wallet_id')
+            .eq('user_id', userId)
+            .eq('currency', 'CREDITS')
+            .limit(1);
 
-        if (walletResult.rows.length === 0) {
+        if (!wallets || wallets.length === 0) {
             return res.status(404).json({ error: 'Wallet not found' });
         }
 
-        const walletId = walletResult.rows[0].wallet_id;
+        const walletId = wallets[0].wallet_id;
         await eventService.cancelParticipation(eventId, walletId);
 
         res.json({
@@ -244,6 +248,32 @@ router.get('/:id/is-participating', requireAuth, async (req, res) => {
     } catch (error) {
         logger.error('Error checking participation:', error);
         res.status(500).json({ error: 'Failed to check participation' });
+    }
+});
+
+/**
+ * POST /api/events/participants/:id/validate
+ * Validate or Reject user participation (admin only)
+ */
+router.post('/participants/:id/validate', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const participantId = req.params.id;
+
+        if (!status) {
+            return res.status(400).json({ error: 'Status is required' });
+        }
+
+        const result = await eventService.validateParticipation(participantId, status);
+
+        res.json({
+            success: true,
+            message: `Participation ${status}`,
+            result
+        });
+    } catch (error) {
+        logger.error('Error validating participation:', error);
+        res.status(400).json({ error: error.message });
     }
 });
 
