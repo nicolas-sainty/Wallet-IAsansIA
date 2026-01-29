@@ -38,11 +38,19 @@ app.use(cors({
 
 // Rate limiting
 const limiter = rateLimit({
+<<<<<<< HEAD
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
+    max: 1000, // Increased for dev usage
+    message: { error: 'Too many requests from this IP, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+=======
     windowMs: 15 * 60 * 1000, // 15 minutes
     limit: 1000, // Relaxed limit for development
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     message: 'Too many requests from this IP, please try again later',
+>>>>>>> fix-detached-head
 });
 app.use('/api/', limiter);
 

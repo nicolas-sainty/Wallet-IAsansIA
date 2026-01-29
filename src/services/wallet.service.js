@@ -317,6 +317,29 @@ class WalletService {
             throw error;
         }
     }
+
+    /**
+     * Get wallets by user ID
+     * @param {string} userId - User ID
+     * @returns {Promise<Array>} Wallets owned by user
+     */
+    async getUserWallets(userId) {
+        try {
+            const query = `
+                SELECT w.*, g.group_name 
+                FROM wallets w
+                LEFT JOIN groups g ON w.group_id = g.group_id
+                WHERE w.user_id = $1 AND w.status = 'active'
+                ORDER BY w.created_at DESC
+            `;
+
+            const result = await db.query(query, [userId]);
+            return result.rows;
+        } catch (error) {
+            logger.error('Error fetching user wallets', { error: error.message, userId });
+            throw error;
+        }
+    }
 }
 
 module.exports = new WalletService();

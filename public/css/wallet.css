@@ -1,0 +1,196 @@
+/* ========================================
+   Premium Wallet UI
+   ======================================== */
+
+.wallet-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2.5rem 1.5rem;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    border: 1px solid var(--glass-border);
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+}
+
+.hero-content {
+    margin-bottom: 2rem;
+    z-index: 2;
+}
+
+.total-balance {
+    font-size: 3.5rem;
+    font-weight: 800;
+    background: linear-gradient(to right, #fff, #b4d2ff);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1.1;
+    margin-top: 0.5rem;
+}
+
+.total-balance small {
+    font-size: 1.2rem;
+    font-weight: 600;
+    opacity: 0.8;
+    -webkit-text-fill-color: var(--text-secondary);
+}
+
+.hero-actions {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    width: 100%;
+    z-index: 2;
+}
+
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover {
+    color: white;
+    transform: translateY(-2px);
+}
+
+.action-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover .action-icon {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Credit Card Style */
+.wallets-grid-premium {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.credit-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.credit-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 60%);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.credit-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.card-chip {
+    width: 40px;
+    height: 30px;
+    background: linear-gradient(135deg, #ffd700, #ffaa00);
+    border-radius: 6px;
+    position: relative;
+    opacity: 0.8;
+}
+
+.card-contactless svg {
+    opacity: 0.7;
+}
+
+.card-balance {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 1.5rem 0;
+    letter-spacing: 1px;
+}
+
+.card-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.card-holder {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+}
+
+.card-holder strong {
+    display: block;
+    color: white;
+    margin-top: 0.2rem;
+}
+
+.card-logo {
+    font-weight: 800;
+    font-style: italic;
+    font-size: 1.2rem;
+    opacity: 0.5;
+}
+
+/* Gradient variants for cards */
+.card-gradient-1 {
+    background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);
+    color: #333;
+}
+
+.card-gradient-2 {
+    background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+    color: #333;
+}
+
+.card-gradient-3 {
+    background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+    color: #333;
+}
+
+/* Keep text white on dark cards if needed, but these gradients are light. 
+   Lets adjust to dark themes or keep standard glass */
+.card-glass {
+    /* Standard glass defined above */
+}

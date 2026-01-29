@@ -1,6 +1,42 @@
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
+<<<<<<< HEAD
+
+const dbPath = path.join(__dirname, '../../database/epicoin.sqlite');
+const db = new sqlite3.Database(dbPath);
+
+// Promisify DB helper (Should abstract this later if time permits)
+const runQuery = (query, params = []) => {
+    return new Promise((resolve, reject) => {
+        db.run(query, params, function (err) {
+            if (err) reject(err);
+            else resolve(this);
+        });
+    });
+};
+
+const getQuery = (query, params = []) => {
+    return new Promise((resolve, reject) => {
+        db.get(query, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
+    });
+};
+
+const allQuery = (query, params = []) => {
+    return new Promise((resolve, reject) => {
+        db.all(query, params, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
+    });
+};
+=======
 const { supabase } = require('../config/database');
+>>>>>>> fix-detached-head
 
 /**
  * Event Service
@@ -10,10 +46,17 @@ class EventService {
     /**
      * Create a new event
      */
-    async createEvent(userId, groupId, title, description, eventDate, rewardPoints, maxParticipants = null, status = 'DRAFT') {
+    async createEvent(groupId, title, description, eventDate, rewardPoints) {
         const eventId = uuidv4();
 
         try {
+<<<<<<< HEAD
+            await runQuery(
+                `INSERT INTO events (event_id, group_id, title, description, event_date, reward_points) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [eventId, groupId, title, description, eventDate, rewardPoints]
+            );
+=======
             const { error } = await supabase
                 .from('events')
                 .insert({
@@ -30,8 +73,9 @@ class EventService {
                 });
 
             if (error) throw error;
+>>>>>>> fix-detached-head
 
-            logger.info(`Event created: ${title} (${eventId}) by user ${userId}`);
+            logger.info(`Event created: ${title} (${eventId})`);
             return this.getEvent(eventId);
         } catch (error) {
             logger.error('Error creating event:', error);
@@ -44,6 +88,15 @@ class EventService {
      */
     async getUpcomingEvents() {
         try {
+<<<<<<< HEAD
+            return await allQuery(
+                `SELECT e.*, g.group_name 
+                 FROM events e 
+                 JOIN groups g ON e.group_id = g.group_id
+                 WHERE e.status = 'upcoming' OR e.status = 'active'
+                 ORDER BY e.event_date ASC`
+            );
+=======
             const { data, error } = await supabase
                 .from('events')
                 .select(`
@@ -61,6 +114,7 @@ class EventService {
                 group_name: event.groups?.group_name || null,
                 creator_name: event.users?.full_name || null
             }));
+>>>>>>> fix-detached-head
         } catch (error) {
             logger.error('Error fetching events:', error);
             throw error;
@@ -71,6 +125,9 @@ class EventService {
      * Get event details
      */
     async getEvent(eventId) {
+<<<<<<< HEAD
+        return await getQuery('SELECT * FROM events WHERE event_id = ?', [eventId]);
+=======
         const { data, error } = await supabase
             .from('events')
             .select(`
@@ -91,6 +148,7 @@ class EventService {
             group_name: data.groups?.group_name || null,
             creator_name: data.users?.full_name || null
         };
+>>>>>>> fix-detached-head
     }
 
     /**
@@ -101,15 +159,16 @@ class EventService {
         const event = await this.getEvent(eventId);
         if (!event) throw new Error('Event not found');
 
-        // Check event status
-        if (event.status === 'FULL') {
-            throw new Error('Event is full');
-        }
-        if (event.status !== 'OPEN') {
-            throw new Error('Event is not open for registration');
-        }
-
         // Check if already participated
+<<<<<<< HEAD
+        const existing = await getQuery(
+            'SELECT * FROM event_participants WHERE event_id = ? AND wallet_id = ?',
+            [eventId, walletId]
+        );
+
+        if (existing) {
+            throw new Error('Wallet has already participated in this event');
+=======
         const { data: existing } = await supabase
             .from('event_participants')
             .select('*')
@@ -118,10 +177,35 @@ class EventService {
 
         if (existing && existing.length > 0) {
             throw new Error('Already registered for this event');
+>>>>>>> fix-detached-head
         }
 
         const participantId = uuidv4();
 
+<<<<<<< HEAD
+        // Transaction to ensure atomicity (SQLite serialized mode handles this mostly, but good practice)
+        // 1. Record participation
+        // 1. Record participation with PENDING status
+        await runQuery(
+            `INSERT INTO event_participants (participant_id, event_id, wallet_id, points_earned, status)
+             VALUES (?, ?, ?, ?, 'PENDING')`,
+            [participantId, eventId, walletId, event.reward_points]
+        );
+
+        // 2. DO NOT Credit wallet yet - Wait for BDE validation
+        // await runQuery(
+        //     `UPDATE wallets SET balance = balance + ? WHERE wallet_id = ?`,
+        //     [event.reward_points, walletId]
+        // );
+
+        logger.info(`Participation recorded (PENDING): Event ${eventId}, Wallet ${walletId}, Points ${event.reward_points}`);
+
+        return {
+            participantId,
+            status: 'PENDING',
+            pointsEarned: event.reward_points
+        };
+=======
         // NOTE: Supabase doesn't support transactions via JS client
         // This is a simplified version - ideally use an RPC function
         try {
@@ -441,6 +525,7 @@ class EventService {
         if (error) return false;
 
         return (data || []).some(ep => ep.wallets?.user_id === userId);
+>>>>>>> fix-detached-head
     }
 }
 
