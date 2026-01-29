@@ -88,6 +88,9 @@ Assurez-vous d'avoir :
 # Mode développement (avec redémarrage automatique)
 npm run dev
 
+# Lancer les tests unitaires
+npm test
+
 # Le serveur sera accessible sur http://localhost:3002
 ```
 
