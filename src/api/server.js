@@ -55,7 +55,15 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // Body parsing and compression
-app.use(express.json({ limit: '10mb' }));
+// Body parsing and compression
+app.use(express.json({
+    limit: '10mb',
+    verify: (req, res, buf) => {
+        if (req.originalUrl.startsWith('/api/webhooks/stripe')) {
+            req.rawBody = buf.toString();
+        }
+    }
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(compression());
 
@@ -130,7 +138,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     logger.info(`🚀 Epicoin API server running on port ${PORT}`);
     logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     logger.info(`🔗 API Documentation: http://localhost:${PORT}/api`);
@@ -140,14 +148,32 @@ app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-    logger.info('SIGTERM received, shutting down gracefully');
-    process.exit(0);
-});
+const gracefulShutdown = (signal) => {
+    logger.info(`${signal} received, shutting down gracefully`);
+    server.close(() => {
+        logger.info('HTTP server closed');
+        // Close database connections if needed
+        // supabase client handles its own connection pooling generally, but if we had explicit disconnect logic it would go here.
+        process.exit(0);
+    });
 
-process.on('SIGINT', () => {
-    logger.info('SIGINT received, shutting down gracefully');
-    process.exit(0);
+    // Force close after 10s if hangs
+    setTimeout(() => {
+        logger.error('Could not close connections in time, forcefully shutting down');
+        process.exit(1);
+    }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle Nodemon restart signal
+process.on('SIGUSR2', () => {
+    logger.info('SIGUSR2 received (Nodemon restart), closing server');
+    server.close(() => {
+        logger.info('HTTP server closed');
+        process.kill(process.pid, 'SIGUSR2');
+    });
 });
 
 module.exports = app;

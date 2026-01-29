@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paiement Réussi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/index.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #111827 0%, #000000 100%);
+            color: white;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 90%;
+            width: 400px;
+        }
+
+        h1 {
+            color: #10b981;
+        }
+
+        .btn {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 10px 20px;
+            background: #4f46e5;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">🎉</div>
+        <h1 id="status-title">Vérification...</h1>
+        <p id="status-message">Veuillez patienter pendant que nous validons votre paiement.</p>
+        <a href="/" class="btn" id="home-btn" style="display: none;">Retour à l'accueil</a>
+    </div>
+
+    <script>
+        async function verifyPayment() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session_id');
+
+            if (!sessionId) {
+                document.getElementById('status-title').textContent = 'Erreur';
+                document.getElementById('status-title').style.color = '#ef4444';
+                document.getElementById('status-message').textContent = 'Session ID manquant.';
+                document.getElementById('home-btn').style.display = 'inline-block';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/payment/verify-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('status-title').textContent = 'Paiement Réussi !';
+                    document.getElementById('status-message').textContent = 'Vos crédits ont été ajoutés à votre wallet.';
+                } else {
+                    document.getElementById('status-title').textContent = 'Paiement non confirmé';
+                    document.getElementById('status-title').style.color = 'orange';
+                    document.getElementById('status-message').textContent = data.message || 'Le paiement n\'est pas encore validé.';
+                }
+            } catch (error) {
+                console.error(error);
+                document.getElementById('status-title').textContent = 'Erreur';
+                document.getElementById('status-title').style.color = '#ef4444';
+                document.getElementById('status-message').textContent = 'Impossible de vérifier le paiement.';
+            } finally {
+                document.getElementById('home-btn').style.display = 'inline-block';
+            }
+        }
+
+        verifyPayment();
+    </script>
+</body>
+
+</html>

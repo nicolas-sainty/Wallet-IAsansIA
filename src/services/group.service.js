@@ -263,49 +263,62 @@ class GroupService {
      */
     async getGroupStats(groupId) {
         try {
-            // 1. Count Members (Active wallets in group with user_id)
-            const { count: memberCount, data: wallets, error: walletError } = await supabase
-                .from('wallets')
-                .select('wallet_id', { count: 'exact' })
-                .eq('group_id', groupId)
-                .neq('user_id', null)
-                .eq('status', 'active');
+            // 1. Count Members (Users associated with this BDE)
+            const { count: memberCount, error: memberError } = await supabase
+                .from('users')
+                .select('user_id', { count: 'exact', head: true })
+                .eq('bde_id', groupId);
 
-            if (walletError) throw walletError;
+            if (memberError) {
+                logger.warn('Error counting members based on bde_id, falling back to wallet count', memberError);
+            };
 
-            // 2. Calculate Volume & Transactions (if wallets exist)
+            // Fallback to active wallets if user count fails or returns 0 (handling legacy data)
+            let finalMemberCount = memberCount;
+            if (!finalMemberCount) {
+                const { count: walletCount } = await supabase
+                    .from('wallets')
+                    .select('wallet_id', { count: 'exact', head: true })
+                    .eq('group_id', groupId)
+                    .neq('user_id', null)
+                    .eq('status', 'active');
+                finalMemberCount = walletCount || 0;
+            }
+
+            // 2. Calculate Volume & Transactions
             let totalVolume = 0;
             let totalTransactions = 0;
+
+            // Get all wallets for this group to filter transactions
+            const { data: wallets } = await supabase
+                .from('wallets')
+                .select('wallet_id')
+                .eq('group_id', groupId);
 
             if (wallets && wallets.length > 0) {
                 const walletIds = wallets.map(w => w.wallet_id);
 
-                // Fetch transactions where source OR dest is in walletIds
-                // Note: 'in' filter with OR logic is tricky in one go if checking both columns.
-                // We'll simplify: Fetch transactions where destination is in group (Incoming/Internal)
-                // OR source is in group (Outgoing/Internal).
-                // For "Volume", we might just sum all amounts.
-
-                // Using a simplified approach: Sum 'CREDITS' transactions for these wallets
-                // We'll fetch relevant transactions. LIMIT to 1000 for performance if needed, or use RPC if available.
-                // client-side aggregation for now (assuming not huge history yet).
-
+                // Batch fetch transactions (chunking could be needed for huge datasets)
+                // We fetch ID to deduplicate if needed, though 'OR' usually yields unique rows in Supabase
                 const { data: txs, error: txError } = await supabase
                     .from('transactions')
-                    .select('amount')
+                    .select('amount, transaction_id')
                     .or(`source_wallet_id.in.(${walletIds.join(',')}),destination_wallet_id.in.(${walletIds.join(',')})`)
                     .eq('currency', 'CREDITS');
 
                 if (!txError && txs) {
-                    totalTransactions = txs.length;
-                    totalVolume = txs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+                    // Deduplicate just in case (though OR should handle it)
+                    const uniqueTxs = [...new Map(txs.map(item => [item.transaction_id, item])).values()];
+
+                    totalTransactions = uniqueTxs.length;
+                    totalVolume = uniqueTxs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
                 }
             }
 
             return {
                 groupId,
-                total_members: memberCount || 0,
-                totalWallets: memberCount || 0, // Alias
+                total_members: finalMemberCount,
+                totalWallets: finalMemberCount, // Keep alias for frontend compatibility
                 totalTransactions,
                 totalVolume,
                 avgTransactionAmount: totalTransactions > 0 ? (totalVolume / totalTransactions) : 0,
@@ -313,7 +326,6 @@ class GroupService {
 
         } catch (error) {
             logger.error('Error calculating group stats', { error: error.message, groupId });
-            // Return zeros on error to prevent crash
             return {
                 groupId,
                 total_members: 0,

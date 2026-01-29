@@ -104,6 +104,8 @@ function formatAmount(amount) {
 }
 
 function truncateId(id) {
+    if (!id) return '';
+    if (id.length <= 14) return id; // Don't truncate if short
     return `${id.substring(0, 8)}...${id.substring(id.length - 6)}`;
 }
 
@@ -944,26 +946,47 @@ async function validateParticipation(participantId, status) {
 
 async function buyProduct(productId) {
     const user = JSON.parse(localStorage.getItem('user'));
-    if (!user || !user.email) {
-        showToast('Erreur utilisateur. Reconnectez-vous.', 'error');
+    if (!user || user.role !== 'student') {
+        showToast('Erreur: Seuls les étudiants peuvent acheter des crédits.', 'error');
         return;
     }
 
-    if (!confirm("Simuler l'achat (Mode Démo) ?")) return;
+    let amount = 0;
+    let credits = 0;
+
+    switch (productId) {
+        case 'pack_10': // Pack Découverte
+            amount = 2.00;
+            credits = 20;
+            break;
+        case 'pack_50': // Pack Standard
+            amount = 5.00;
+            credits = 50;
+            break;
+        case 'pack_100': // Pack Premium
+            amount = 10.00;
+            credits = 100;
+            break;
+        default:
+            console.error('Unknown product');
+            return;
+    }
 
     try {
-        await api.post('/api/payment/simulate', {
-            productId,
-            email: user.email
+        showToast('Redirection vers Stripe...', 'info');
+        const res = await api.post('/api/payment/create-checkout-session', {
+            amount,
+            credits
         });
-        showToast('Achat simule avec succès ! +Credits', 'success');
 
-        // If we are on the dashboard/card view (which splits shop/home in single page app sometimes)
-        // But here shop is separate HTML. 
-        // We can just log. Next load of card will fetch fresh data.
-        console.log("Purchase simulated. Balance should update on next fetch.");
+        if (res.url) {
+            window.location.href = res.url;
+        } else {
+            showToast('Erreur lors de la création de la session Stripe', 'error');
+        }
     } catch (error) {
-        showToast(error.message, 'error');
+        console.error(error);
+        showToast(error.message || "Erreur de paiement", 'error');
     }
 }
 

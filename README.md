@@ -1,157 +1,193 @@
-# Student Wallet
+# 💰 Epicoin Wallet - Système de Paiement Étudiant
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue.svg)](https://www.postgresql.org/)
+Une solution complète de portefeuille numérique pour les associations étudiantes (BDE), permettant la gestion de crédits, le paiement d'événements et le suivi financier.
 
-> Système de wallet étudiant pour gérer des crédits et des paiements au sein d'associations étudiantes
+## 🏗 Architecture & Choix Technologiques
 
-## 🚀 Installation Rapide
+Ce projet a été conçu pour être **performant, modulable et facile à déployer**.
 
-### Prérequis
-
-- [Node.js](https://nodejs.org/) 18+ et npm
-- [PostgreSQL](https://www.postgresql.org/) 14+
-- Git
-
-### Setup
-
-```bash
-# 1. Cloner le projet
-git clone https://github.com/nicolas-sainty/Wallet-IAsansIA.git
-cd Wallet-IAsansIA
-
-# 2. Installer les dépendances
-npm install
-
-# 3. Configurer l'environnement
-cp .env.example .env
-# Éditer .env avec vos paramètres PostgreSQL
-
-# 4. Créer la base de données
-psql -U postgres -c "CREATE DATABASE student_wallet_db;"
-psql -U postgres -d student_wallet_db -f database/schema.sql
-
-# 5. Démarrer l'application
-npm run dev
+```mermaid
+graph TD
+    User[📱 App Étudiant / Admin]
+    Backend[🚀 Node.js API Gateway]
+    DB[(🗄️ Supabase PostgreSQL)]
+    Stripe[💳 Stripe Payments]
+    
+    User -- HTTPS/JSON --> Backend
+    Backend -- SQL/RPC --> DB
+    Backend -- Webhook/API --> Stripe
+    Stripe -- Webhook --> Backend
+    Stripe -- Redirect --> User
+    
+    subgraph "Core Services"
+        Auth[Auth Middleware]
+        Wallet[Wallet Service]
+        Trans[Transaction Service]
+        Event[Event Service]
+    end
+    
+    Backend --> Auth
+    Backend --> Wallet
+    Backend --> Trans
+    Backend --> Event
 ```
 
-L'application sera accessible sur **http://localhost:3000** 🎉
+### 🧱 Stack Technique
 
-## 🔧 Configuration
-
-### Fichier `.env`
-
-```env
-# Database
-DB_USER=postgres
-DB_HOST=localhost
-DB_DATABASE=student_wallet_db
-DB_PASSWORD=your_password
-DB_PORT=5432
-
-# Server
-PORT=3000
-NODE_ENV=development
-```
-
-## 📁 Structure du Projet
-
-```
-Wallet-IAsansIA/
-├── database/
-│   └── schema.sql           # Schéma de la base de données
-├── public/
-│   ├── css/                 # Styles CSS
-│   ├── js/                  # Scripts frontend
-│   ├── index.html           # Page principale
-│   ├── shop.html            # Boutique de crédits
-│   ├── events.html          # Événements
-│   ├── profile.html         # Profil utilisateur
-│   └── login.html           # Authentification
-├── src/
-│   ├── api/
-│   │   └── server.js        # Serveur Express
-│   ├── config/
-│   │   ├── database.js      # Configuration PostgreSQL
-│   │   └── logger.js        # Logger Winston
-│   ├── routes/
-│   │   ├── auth.routes.js
-│   │   ├── wallets.routes.js
-│   │   ├── payment.routes.js
-│   │   └── transactions.routes.js
-│   └── services/
-│       ├── auth.service.js
-│       ├── wallet.service.js
-│       ├── payment.service.js
-│       └── transaction.service.js
-└── package.json
-```
-
-## 🎯 Fonctionnalités
-
-- ✅ **Authentification** : Inscription et connexion sécurisées
-- ✅ **Wallets** : Gestion de wallets multi-devises (CREDITS, EUR)
-- ✅ **Achats de crédits** : Simulation d'achat avec packs prédéfinis
-- ✅ **Transactions** : Historique complet des transactions
-- ✅ **Profil utilisateur** : Gestion du compte et des informations
-
-## 🎨 Interface
-
-L'interface utilise un design moderne avec :
-- Mode sombre avec palette navy blue, bright blue, coral orange et cream
-- Glassmorphism et effets de transparence
-- Animations fluides
-- Interface responsive mobile-first
-
-## 🔒 Sécurité
-
-- Mots de passe hashés avec bcrypt
-- Sessions sécurisées
-- Validation des entrées
-- Protection CORS
-- Logging des événements
-
-## 📝 API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Créer un compte
-- `POST /api/auth/login` - Se connecter
-- `POST /api/auth/logout` - Se déconnecter
-
-### Wallets
-- `GET /api/wallets/user/:userId` - Wallets d'un utilisateur
-- `GET /api/wallets/:walletId/transactions` - Historique des transactions
-
-### Payment
-- `POST /api/payment/simulate` - Simuler un achat de crédits
-
-## 🐛 Dépannage
-
-### La base de données ne se connecte pas
-- Vérifiez que PostgreSQL est démarré
-- Vérifiez les identifiants dans `.env`
-- Vérifiez que la base de données existe
-
-### Erreur au démarrage du serveur
-```bash
-# Vérifier que le port 3000 n'est pas déjà utilisé
-netstat -ano | findstr :3000  # Windows
-lsof -i :3000                 # Mac/Linux
-```
-
-### Les transactions ne fonctionnent pas
-- Assurez-vous que le schéma SQL est bien appliqué
-- Vérifiez les logs dans `logs/error.log`
-
-## 📄 License
-
-MIT License - Voir le fichier LICENSE pour plus de détails
-
-## 👥 Contribution
-
-Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
+| Composant | Technologie | Pourquoi ce choix ? |
+|-----------|-------------|---------------------|
+| **Backend** | **Node.js + Express** | Architecture événementielle non-bloquante idéale pour les transactions en temps réel. Écosystème riche et développement rapide. |
+| **Base de Données** | **Supabase (PostgreSQL)** | Puissance du SQL relationnel combinée à une API moderne. Sécurité (RLS), scalabilité et gestion facile des données. |
+| **Frontend** | **Vanilla JS + HTML5 + CSS3** | Performance native maximale, aucun temps de build, légèreté absolue. Design "Premium" avec CSS moderne (Glassmorphism). |
+| **Paiement** | **Stripe** | Standard de l'industrie pour les paiements sécurisés. Gestion des sessions de checkout et webhooks (avec fallback manuel robuste). |
 
 ---
 
-**Développé avec ❤️ pour les associations étudiantes**
+## ✨ Fonctionnalités Clés
+
+### 🎓 Pour les Étudiants
+- **Portefeuille Numérique** : Solde en temps réel (Crédits & Euros).
+- **Historique** : Suivi détaillé de toutes les transactions (Entrées/Sorties).
+- **Rechargement** : Achat de crédits via Stripe (Carte Bancaire).
+- **Événements** : Inscription aux événements BDE et paiement en crédits.
+- **Paiements BDE** : Virement instantané vers le BDE ou paiement via QR Code (simulé).
+
+### 🛡️ Pour les Admins & BDE
+- **Dashboard Financier** : Vue globale sur la trésorerie, volumes de ventes et statistiques.
+- **Gestion Événements** : Création, modification et suivi des participants.
+- **Gestion Étudiants** : Vue liste des utilisateurs, solde et actions rapides.
+- **Validation** : Scan/Check-in des participants aux événements.
+
+---
+
+## 🚀 Installation & Démarrage
+
+### Pré-requis
+- Node.js (v18+)
+- Compte Supabase
+- Compte Stripe
+
+### 1. Clonage et Installation
+```bash
+git clone https://github.com/votre-repo/wallet-ia-sans-ia.git
+cd Wallet-IAsansIA
+npm install
+```
+
+### 2. Configuration (`.env`)
+Copiez le fichier d'exemple et remplissez vos clés :
+```bash
+cp .env.example .env
+```
+Assurez-vous d'avoir :
+- `SUPABASE_URL` & `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_SECRET_KEY`
+
+### 3. Lancement
+```bash
+# Mode développement (avec redémarrage automatique)
+npm run dev
+
+# Le serveur sera accessible sur http://localhost:3002
+```
+
+## 🔄 Flux de Paiement (Diagramme de Séquence)
+
+```mermaid
+sequenceDiagram
+    participant User as 👤 Étudiant
+    participant UI as 📱 Frontend
+    participant API as 🚀 Backend
+    participant Stripe as 💳 Stripe
+    participant DB as 🗄️ Database
+
+    User->>UI: Clique "Acheter 100 Crédits"
+    UI->>API: POST /create-checkout-session
+    API->>Stripe: Crée Session
+    Stripe-->>API: URL de Paiement
+    API-->>UI: Redirection
+    UI->>User: Page de Paiement Stripe
+    User->>Stripe: Paie par CB
+    Stripe->>UI: Redirection /success
+    
+    rect rgb(20, 30, 40)
+        Note right of UI: Vérification Robuste
+        UI->>API: POST /verify-session (Auto-call)
+        API->>Stripe: Vérifie statut "paid"
+        API->>DB: Check/Create Wallet, Insert Transaction (CASHIN)
+        DB-->>API: OK
+        API-->>UI: Succès & Nouveau Solde
+    end
+```
+
+
+## 💸 Protocole d'Échange de Crédits (P2P et BDE)
+
+Le système gère plusieurs types de flux financiers entre les entités (Étudiants, BDE, Système).
+
+### 1. Achat de Crédits (Fiat -> Token)
+- **Source** : Carte Bancaire (Stripe)
+- **Destination** : Portefeuille Étudiant (CREDITS) **ET** Portefeuille BDE (EUR)
+- **Logique** : L'étudiant reçoit des tokens utilisables dans l'écosystème. Le BDE reçoit instantanément la contre-valeur en Euros.
+
+### 2. Transfert P2P (Étudiant -> Étudiant)
+Permet le remboursement ou le partage de frais entre étudiants.
+
+```mermaid
+sequenceDiagram
+    participant Sender as 📤 Envoyeur
+    participant API as ⚡ Backend
+    participant DB as 🗄️ Database
+    participant Receiver as 📥 Receveur
+
+    Sender->>API: POST /transfer (TargetEmail, Amount)
+    API->>DB: Vérifie Solde Envoyeur > Amount
+    API->>DB: Trouve Wallet ID Receveur
+    
+    rect rgb(30, 20, 40)
+        Note right of API: Transaction Atomique
+        API->>DB: Débite Envoyeur (-Amount)
+        API->>DB: Crédite Receveur (+Amount)
+        API->>DB: Log Transaction (Type: TRANSFER)
+    end
+    
+    DB-->>API: Succès
+    API-->>Sender: Confirmation (Nouveau Solde)
+    Note left of Receiver: Notifié par Email/Notif
+```
+
+### 3. Paiement BDE (Étudiant -> BDE)
+Utilisé pour payer un événement ou une consommation.
+- **Flux** : Débit Wallet Étudiant -> Crédit Wallet BDE (en Crédits)
+- **Validation** : Scan QR Code ou Validation Manuelle par Admin.
+
+### 4. Spécification Technique (JSON Protocol)
+
+Pour initier une transaction (Endpoint: `POST /api/transactions`), le payload JSON suivant est requis :
+
+```json
+{
+  "initiatorUserId": "uuid-v4",       // ID de l'utilisateur qui initie
+  "sourceWalletId": "uuid-v4",        // Portefeuille à débiter
+  "destinationWalletId": "uuid-v4",   // Portefeuille à créditer
+  "amount": 10.50,                    // Montant (positif uniquement)
+  "transactionType": "P2P",           // Enum: [P2P, MERCHANT, CASHIN, CASHOUT]
+  "currency": "CREDITS",              // (Optionnel) Default: CREDITS
+  "description": "Remboursement Pizza" // (Optionnel) Max 500 chars
+}
+```
+
+**Réponse (Succès 201)** :
+```json
+{
+  "success": true,
+  "data": {
+    "transaction_id": "uuid-v4",
+    "status": "PENDING", // ou SUCCESS immédiat
+    "created_at": "ISO-8601 Timestamp"
+  }
+}
+```
+
+---
+*Projet réalisé dans le cadre du module Wallet IAsansIA.*
