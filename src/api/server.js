@@ -15,6 +15,17 @@ const authRoutes = require('../routes/auth.routes');
 const paymentRoutes = require('../routes/payment.routes');
 const webhookRoutes = require('../routes/webhooks.routes');
 
+// Architecture Hexagonale (v2)
+const bootstrap = require('../infrastructure/di');
+const { 
+    transactionRoutesHex, 
+    walletRoutesHex, 
+    authRoutesHex,
+    groupRoutesHex,
+    eventRoutesHex,
+    paymentRoutesHex
+} = bootstrap();
+
 const app = express();
 const PORT = process.env.API_PORT || 3000;
 
@@ -132,6 +143,14 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
+
+// Architecture Hexagonale (v2 API)
+app.use('/api/v2/transactions', transactionRoutesHex);
+app.use('/api/v2/wallets', walletRoutesHex);
+app.use('/api/v2/auth', authRoutesHex);
+app.use('/api/v2/groups', groupRoutesHex);
+app.use('/api/v2/events', eventRoutesHex);
+app.use('/api/v2/payment', paymentRoutesHex);
 
 // Static files (frontend)
 app.use(express.static('public'));

@@ -56,7 +56,7 @@ const api = {
 
         if (response.status === 401 && retryOn401) {
             // Refresh access token via HttpOnly cookie.
-            const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, {
+            const refreshRes = await fetch(`${API_BASE}/api/v2/auth/refresh`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
@@ -190,7 +190,7 @@ async function loadCardData() {
 
         // Fetch User Wallet (CREDITS)
         // Use existing /api/wallets endpoint with userId query
-        const result = await api.get(`/api/wallets?userId=${user.userId || user.user_id}`);
+        const result = await api.get(`/api/v2/wallets?userId=${user.userId || user.user_id}`);
         const wallets = result.data || [];
 
         // Find CREDITS wallet (or first available if none specific)
@@ -211,7 +211,7 @@ async function loadCardData() {
         // Load History (Placeholder or real)
         const activityList = document.getElementById('recentTransactionsList');
         if (activityList && creditWallet) {
-            const txResult = await api.get(`/api/wallets/${creditWallet.wallet_id}/transactions`);
+            const txResult = await api.get(`/api/v2/wallets/${creditWallet.wallet_id}/transactions`);
             const txs = txResult.data || [];
             if (txs.length === 0) {
                 activityList.innerHTML = '<p class="empty-text">Aucune transaction.</p>';
@@ -247,7 +247,7 @@ async function loadGroupsForPay() {
             return;
         }
 
-        const result = await api.get(`/api/groups/${user.bde_id}`);
+        const result = await api.get(`/api/v2/groups/${user.bde_id}`);
         const group = result.data;
 
         if (group) {
@@ -265,7 +265,7 @@ async function loadHomeRequests() {
     if (!container) return;
 
     try {
-        const res = await api.get('/api/payment/requests');
+        const res = await api.get('/api/v2/payment/requests');
         const requests = res.data || [];
 
         if (requests.length > 0) {
@@ -278,8 +278,8 @@ async function loadHomeRequests() {
                     </div>
                     <p style="margin:0 0 1rem 0; font-size:0.9rem;">${r.description || 'Paiement requis'}</p>
                     <div style="display:flex; gap:0.5rem;">
-                        <button class="btn-primary" style="flex:1; padding:0.5rem;" onclick="respondRequestHome('${r.request_id}', 'PAY')">Payer</button>
-                        <button class="btn-secondary" style="flex:1; padding:0.5rem;" onclick="respondRequestHome('${r.request_id}', 'REJECT')">Rejeter</button>
+                        <button class="btn-primary btn-respond-request" style="flex:1; padding:0.5rem;" data-id="${r.request_id}" data-action="PAY">Payer</button>
+                        <button class="btn-secondary btn-respond-request" style="flex:1; padding:0.5rem;" data-id="${r.request_id}" data-action="REJECT">Rejeter</button>
                     </div>
                 </div>
             `).join('');
@@ -289,7 +289,7 @@ async function loadHomeRequests() {
                 window.respondRequestHome = async (reqId, action) => {
                     if (!confirm(action === 'PAY' ? "Confirmer le paiement ?" : "Refuser la demande ?")) return;
                     try {
-                        await api.post(`/api/payment/requests/${reqId}/respond`, { action });
+                        await api.post(`/api/v2/payment/requests/${reqId}/respond`, { action });
                         showToast("Action effectuée !", "success");
                         setTimeout(() => window.location.reload(), 500);
                     } catch (e) { showToast(e.message, 'error'); }
@@ -331,7 +331,7 @@ async function processPayment() {
     }
 
     try {
-        await api.post('/api/transactions/pay', {
+        await api.post('/api/v2/transactions/pay', {
             userId: user.userId || user.user_id, // Check how userId is stored
             groupId: groupId,
             amount: amount
@@ -351,7 +351,7 @@ async function processPayment() {
 
 async function loadEvents() {
     try {
-        const result = await api.get('/api/events');
+        const result = await api.get('/api/v2/events');
         state.events = result.data || [];
         renderEvents();
     } catch (error) {
@@ -426,8 +426,8 @@ function renderEvents() {
             if (status === 'OPEN') {
                 actionArea = `
                     <div id="${eventCardId}">
-                        <button class="btn-primary" style="font-size: 1rem; padding: 1rem; width: 100%; justify-content: center;" 
-                                onclick="participateInEvent('${event.event_id}')">
+                        <button class="btn-primary btn-participate" style="font-size: 1rem; padding: 1rem; width: 100%; justify-content: center;" 
+                                data-event-id="${event.event_id}">
                             S'inscrire
                         </button>
                     </div>
@@ -483,7 +483,7 @@ async function checkUserRegistrationStatus(eventId) {
     if (!user) return null;
 
     try {
-        const result = await api.get(`/api/events/${eventId}/participants`);
+        const result = await api.get(`/api/v2/events/${eventId}/participants`);
         const participants = result.data || [];
         const userParticipation = participants.find(p => p.user_id === (user.userId || user.user_id));
         return userParticipation ? userParticipation.status : null;
@@ -517,7 +517,7 @@ async function participateInEvent(eventId) {
     `;
 
     try {
-        await api.post(`/api/events/${eventId}/participate`, {});
+        await api.post(`/api/v2/events/${eventId}/participate`, {});
         actionContainer.innerHTML = `<span style="background: #10b981; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">✅ Présence validée</span>`;
         showToast('Inscription réussie !', 'success');
 
@@ -539,7 +539,7 @@ async function loadEventParticipants(eventId) {
     container.innerHTML = '<small>Chargement...</small>';
 
     try {
-        const result = await api.get('/api/events/pending');
+        const result = await api.get('/api/v2/events/pending');
         const allPending = result.data || [];
         const eventPending = allPending.filter(p => p.event_id === eventId);
 
@@ -554,8 +554,8 @@ async function loadEventParticipants(eventId) {
                     <span style="font-weight: 600; font-size: 0.9rem;">${p.user_name}</span>
                 </div>
                 <div style="display: flex; gap: 0.2rem;">
-                    <button style="background: #10b981; border: none; border-radius: 4px; cursor: pointer; padding: 2px 6px;" onclick="validateParticipation('${p.participant_id}', 'verified')">✔</button>
-                    <button style="background: #ef4444; border: none; border-radius: 4px; cursor: pointer; padding: 2px 6px;" onclick="validateParticipation('${p.participant_id}', 'rejected')">✖</button>
+                    <button class="btn-validate" style="background: #10b981; border: none; border-radius: 4px; cursor: pointer; padding: 2px 6px;" data-id="${p.participant_id}" data-status="verified">✔</button>
+                    <button class="btn-validate" style="background: #ef4444; border: none; border-radius: 4px; cursor: pointer; padding: 2px 6px;" data-id="${p.participant_id}" data-status="rejected">✖</button>
                 </div>
             </div>
         `).join('');
@@ -567,7 +567,7 @@ async function loadEventParticipants(eventId) {
 
 async function validateParticipation(participantId, status) {
     try {
-        await api.post(`/api/events/participants/${participantId}/validate`, { status });
+        await api.post(`/api/v2/events/participants/${participantId}/validate`, { status });
         showToast(status === 'verified' ? 'Validé !' : 'Rejeté', 'success');
         // Refresh the specific list? Hard to access parent ID here easily without DOM trav.
         showToast('Refresh manuel requis pour voir les changements (Demo)', 'info');
@@ -606,7 +606,7 @@ async function buyProduct(productId) {
 
     try {
         showToast('Redirection vers Stripe...', 'info');
-        const res = await api.post('/api/payment/create-checkout-session', {
+        const res = await api.post('/api/v2/payment/create-checkout-session', {
             amount,
             credits
         });
@@ -630,11 +630,11 @@ async function createEvent() {
 
     // Need group ID. For demo, fetch groups and pick first.
     try {
-        const grpRes = await api.get('/api/groups');
+        const grpRes = await api.get('/api/v2/groups');
         if (!grpRes.data || grpRes.data.length === 0) {
             alert("Aucun groupe BDE trouvé."); return;
         }
-        await api.post('/api/events', {
+        await api.post('/api/v2/events', {
             groupId: grpRes.data[0].group_id,
             title,
             description: 'Event Mobile',
@@ -664,6 +664,43 @@ async function init() {
     window.processPayment = processPayment;
     window.buyProduct = buyProduct;
     window.participateInEvent = participateInEvent;
+    
+    // Event Delegation for CSP compliance
+    const eventsGrid = document.getElementById('eventsGrid');
+    if (eventsGrid) {
+        eventsGrid.addEventListener('click', async (e) => {
+            // Participation
+            const partBtn = e.target.closest('.btn-participate');
+            if (partBtn) {
+                const eventId = partBtn.getAttribute('data-event-id');
+                if (eventId) participateInEvent(eventId);
+                return;
+            }
+
+            // Validation
+            const valBtn = e.target.closest('.btn-validate');
+            if (valBtn) {
+                const id = valBtn.getAttribute('data-id');
+                const status = valBtn.getAttribute('data-status');
+                if (id && status) validateParticipation(id, status);
+                return;
+            }
+        });
+    }
+
+    const requestsContainer = document.getElementById('homePendingRequests');
+    if (requestsContainer) {
+        requestsContainer.addEventListener('click', async (e) => {
+            const btn = e.target.closest('.btn-respond-request');
+            if (btn) {
+                const id = btn.getAttribute('data-id');
+                const action = btn.getAttribute('data-action');
+                if (id && action && window.respondRequestHome) {
+                    window.respondRequestHome(id, action);
+                }
+            }
+        });
+    }
 
     const path = window.location.pathname;
 
