@@ -45,7 +45,8 @@ class PaymentService {
             return;
         }
 
-        logger.info(`Processing payment for ${userEmail}: +${creditsToAdd} credits`);
+        // Avoid logging personal data (email) in production logs.
+        logger.info('Processing payment', { productId, creditsToAdd });
 
         await this.creditUser(userEmail, creditsToAdd);
     }
@@ -58,7 +59,7 @@ class PaymentService {
             .eq('email', email);
 
         if (userError || !users || users.length === 0) {
-            logger.warn(`User not found for payment: ${email}.`);
+            logger.warn('User not found for payment.');
             return;
         }
 
@@ -134,7 +135,7 @@ class PaymentService {
                         destination_wallet_id: bdeWallet.wallet_id,
                         amount: revenueEur,
                         currency: 'EUR',
-                        transaction_type: 'PURCHASE',
+                        transaction_type: 'CASHIN',
                         direction: 'incoming',
                         status: 'SUCCESS',
                         description: 'Vente Pack Credits'

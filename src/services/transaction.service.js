@@ -17,6 +17,7 @@ class TransactionService {
             amount,
             currency = 'EPIC',
             transactionType,
+            autoProcess = true,
             description = '',
             country = null,
             city = null,
@@ -78,13 +79,15 @@ class TransactionService {
                 destinationWalletId,
             });
 
-            // Process transaction asynchronously
-            this.processTransaction(transactionId).catch((error) => {
-                logger.error('Transaction processing failed', {
-                    transactionId,
-                    error: error.message,
+            // Process transaction asynchronously by default.
+            if (autoProcess) {
+                this.processTransaction(transactionId).catch((error) => {
+                    logger.error('Transaction processing failed', {
+                        transactionId,
+                        error: error.message,
+                    });
                 });
-            });
+            }
 
             return data;
         } catch (error) {
@@ -100,83 +103,107 @@ class TransactionService {
      * @returns {Promise<Object>} Processed transaction
      */
     async processTransaction(transactionId) {
+        // Preferred: atomic DB RPC (prevents race conditions).
         try {
-            // Get transaction details
-            const { data: transaction, error: txError } = await supabase
-                .from('transactions')
-                .select('*')
-                .eq('transaction_id', transactionId)
-                .single();
-
-            if (txError || !transaction) {
-                throw new Error('Transaction not found');
-            }
-
-            if (transaction.status !== 'PENDING') {
-                throw new Error('Transaction already processed');
-            }
-
-            // Debit source wallet
-            await walletService.updateBalance(
-                null, // No client in Supabase
-                transaction.source_wallet_id,
-                -transaction.amount
+            const { data: updatedTx, error } = await supabase.rpc(
+                'rpc_process_transaction_atomic',
+                { p_transaction_id: transactionId }
             );
 
-            // Credit destination wallet
-            await walletService.updateBalance(
-                null,
-                transaction.destination_wallet_id,
-                transaction.amount
-            );
+            if (error) throw error;
+            if (!updatedTx) throw new Error('RPC returned empty transaction');
 
-            // Update transaction status
-            const { data: updatedTx, error: updateError } = await supabase
-                .from('transactions')
-                .update({
-                    status: 'SUCCESS',
-                    executed_at: new Date().toISOString()
-                })
-                .eq('transaction_id', transactionId)
-                .select()
-                .single();
+            // Update trust scores if inter-group (kept in application layer).
+            const sourceWallet = await walletService.getWallet(updatedTx.source_wallet_id);
+            const destWallet = await walletService.getWallet(updatedTx.destination_wallet_id);
 
-            if (updateError) throw updateError;
-
-            logger.info('Transaction processed successfully', { transactionId });
-
-            // Update trust scores if inter-group
-            const sourceWallet = await walletService.getWallet(transaction.source_wallet_id);
-            const destWallet = await walletService.getWallet(transaction.destination_wallet_id);
-
-            if (sourceWallet.group_id !== destWallet.group_id) {
+            if (sourceWallet?.group_id && destWallet?.group_id && sourceWallet.group_id !== destWallet.group_id) {
                 await this.updateTrustScore(
                     null,
                     sourceWallet.group_id,
                     destWallet.group_id,
-                    transaction.amount,
-                    true
+                    parseFloat(updatedTx.amount),
+                    updatedTx.status === 'SUCCESS'
                 );
             }
 
             return updatedTx;
-        } catch (error) {
-            // Update transaction as failed
-            await supabase
-                .from('transactions')
-                .update({
-                    status: 'FAILED',
-                    reason_code: error.message,
-                    executed_at: new Date().toISOString()
-                })
-                .eq('transaction_id', transactionId);
+        } catch (rpcError) {
+            // Fallback legacy logic (kept for environments without the RPC).
+            try {
+                const { data: transaction, error: txError } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('transaction_id', transactionId)
+                    .single();
 
-            logger.error('Transaction processing failed', {
-                transactionId,
-                error: error.message,
-            });
+                if (txError || !transaction) {
+                    throw new Error('Transaction not found');
+                }
 
-            throw error;
+                if (transaction.status !== 'PENDING') {
+                    throw new Error('Transaction already processed');
+                }
+
+                // Debit source wallet
+                await walletService.updateBalance(
+                    null,
+                    transaction.source_wallet_id,
+                    -transaction.amount
+                );
+
+                // Credit destination wallet
+                await walletService.updateBalance(
+                    null,
+                    transaction.destination_wallet_id,
+                    transaction.amount
+                );
+
+                // Update transaction status
+                const { data: updatedTx } = await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'SUCCESS',
+                        executed_at: new Date().toISOString()
+                    })
+                    .eq('transaction_id', transactionId)
+                    .select()
+                    .single();
+
+                // Update trust scores if inter-group
+                const sourceWallet = await walletService.getWallet(transaction.source_wallet_id);
+                const destWallet = await walletService.getWallet(transaction.destination_wallet_id);
+
+                if (sourceWallet.group_id !== destWallet.group_id) {
+                    await this.updateTrustScore(
+                        null,
+                        sourceWallet.group_id,
+                        destWallet.group_id,
+                        transaction.amount,
+                        true
+                    );
+                }
+
+                return updatedTx;
+            } catch (legacyError) {
+                // Update transaction as failed
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'FAILED',
+                        reason_code: legacyError.message,
+                        executed_at: new Date().toISOString()
+                    })
+                    .eq('transaction_id', transactionId);
+
+                logger.error('Transaction processing failed', {
+                    transactionId,
+                    error: legacyError.message,
+                    rpcError: rpcError.message,
+                });
+
+                throw legacyError;
+            }
         }
     }
 
@@ -387,6 +414,7 @@ class TransactionService {
                 .select('*')
                 .eq('group_id', groupId)
                 .eq('currency', 'CREDITS')
+                .is('user_id', null)
                 .eq('status', 'active')
                 .limit(1);
 
@@ -410,15 +438,19 @@ class TransactionService {
             }
 
             // 3. Initiate Transaction
-            return await this.initiateTransaction({
+            const tx = await this.initiateTransaction({
                 initiatorUserId: userId,
                 sourceWalletId: sourceWallet.wallet_id,
                 destinationWalletId: destWalletId,
                 amount: amount,
                 currency: 'CREDITS',
-                transactionType: 'PAYMENT',
-                description: 'Paiement BDE'
+                transactionType: 'MERCHANT',
+                description: 'Paiement BDE',
+                autoProcess: false,
             });
+
+            // For payments endpoint UX: ensure balances are updated before responding.
+            return await this.processTransaction(tx.transaction_id);
 
         } catch (error) {
             logger.error('Credit transfer failed', { error: error.message, userId, groupId });
@@ -555,9 +587,17 @@ class TransactionService {
         }
 
         if (action === 'PAY') {
-            // Simplified - should use RPC for atomicity
             try {
-                // Get Student Wallet (CREDITS)
+                // Preferred: atomic RPC to debit/credit + insert transaction + mark request PAID.
+                const { data: updatedReq, error: rpcError } = await supabase.rpc(
+                    'rpc_respond_payment_request_atomic',
+                    { p_request_id: requestId, p_student_user_id: studentUserId }
+                );
+
+                if (rpcError) throw rpcError;
+                return { status: 'PAID', request: updatedReq };
+            } catch (rpcError) {
+                // Legacy fallback: keep previous JS implementation.
                 const { data: sWallet } = await supabase
                     .from('wallets')
                     .select('wallet_id')
@@ -569,7 +609,6 @@ class TransactionService {
                 if (!sWallet) throw new Error("No CREDITS wallet found");
                 const sourceWalletId = sWallet.wallet_id;
 
-                // Get BDE Wallet (CREDITS) - MUST be the group wallet (user_id is null)
                 const { data: bWallet } = await supabase
                     .from('wallets')
                     .select('wallet_id')
@@ -582,23 +621,14 @@ class TransactionService {
                 if (!bWallet) throw new Error(`BDE has no CREDITS wallet (Group: ${request.bde_group_id})`);
                 const destWalletId = bWallet.wallet_id;
 
-                // Check Balance
                 const balanceRes = await walletService.getBalance(sourceWalletId);
-                logger.info(`Processing Payment:`);
-                logger.info(`- Request: ${requestId} (Amount: ${request.amount})`);
-                logger.info(`- Source (Student): ${sourceWalletId} (Balance: ${balanceRes.availableBalance})`);
-                logger.info(`- Dest (BDE): ${destWalletId} (Group: ${request.bde_group_id})`);
-
                 if (balanceRes.availableBalance < parseFloat(request.amount)) {
                     throw new Error("Insufficient funds");
                 }
 
-                // Execute Transfer
-                logger.info(`Executing transfer: Source=${sourceWalletId}, Dest=${destWalletId}, Amount=${request.amount}`);
                 await walletService.updateBalance(null, sourceWalletId, -parseFloat(request.amount));
                 await walletService.updateBalance(null, destWalletId, parseFloat(request.amount));
 
-                // Log Transaction
                 await supabase
                     .from('transactions')
                     .insert({
@@ -608,13 +638,12 @@ class TransactionService {
                         destination_wallet_id: destWalletId,
                         amount: request.amount,
                         currency: 'CREDITS',
-                        transaction_type: 'PAYMENT',
+                        transaction_type: 'MERCHANT',
                         direction: 'outgoing',
                         status: 'SUCCESS',
                         description: `Paiement demande: ${request.description}`
                     });
 
-                // Update Request Status
                 await supabase
                     .from('payment_requests')
                     .update({
@@ -624,9 +653,6 @@ class TransactionService {
                     .eq('request_id', requestId);
 
                 return { status: 'PAID' };
-            } catch (error) {
-                logger.error('Payment request processing failed', error);
-                throw error;
             }
         }
     }

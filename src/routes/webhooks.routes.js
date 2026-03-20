@@ -21,39 +21,100 @@ router.post('/stripe', async (req, res) => {
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
         const { userId, groupId, creditsAmount } = session.metadata;
+        const stripeSessionId = session.id;
         const amountEur = session.amount_total / 100;
 
         logger.info(`Payment successful for user ${userId}. Amount: ${amountEur} EUR, Credits: ${creditsAmount}`);
 
         try {
-            // 1. Credit User's Credit Wallet
-            const { data: userWallets } = await supabase
-                .from('wallets')
-                .select('wallet_id')
-                .eq('user_id', userId)
-                .eq('currency', 'CREDITS')
-                .eq('status', 'active')
-                .single();
+            // Atomic + idempotent fulfillment (exactly once).
+            const { data: rpcData, error } = await supabase.rpc(
+                'rpc_fulfill_stripe_checkout_atomic',
+                {
+                    p_stripe_session_id: stripeSessionId,
+                    p_user_id: userId,
+                    p_bde_group_id: groupId,
+                    p_credits_amount: parseFloat(creditsAmount),
+                    p_amount_eur: parseFloat(amountEur),
+                }
+            );
 
-            if (userWallets) {
-                await walletService.updateBalance(null, userWallets.wallet_id, parseFloat(creditsAmount));
+            if (error) throw error;
+            logger.info(`Stripe session processed (${stripeSessionId}): ${rpcData}`);
 
-                // Log transaction System -> User (Credits)
+        } catch (error) {
+            // Fallback for environments where the RPC isn't available yet.
+            // We still try to keep idempotency using stripe_checkout_processed_sessions marker.
+            logger.error('Error fulfilling order (RPC failed), fallback to legacy', { stripeSessionId, error: error.message });
+
+            try {
+                // Idempotency guard independent of marker table availability.
+                const { data: existingTx } = await supabase
+                    .from('transactions')
+                    .select('transaction_id')
+                    .eq('provider', 'stripe')
+                    .eq('provider_tx_id', `${stripeSessionId}:credits`)
+                    .maybeSingle();
+
+                if (existingTx) {
+                    return res.json({ received: true, alreadyProcessed: true });
+                }
+
+                // Attempt marker insertion to prevent double-credit on retries.
+                const { error: markerErr } = await supabase
+                    .from('stripe_checkout_processed_sessions')
+                    .insert({
+                        stripe_session_id: stripeSessionId,
+                        user_id: userId,
+                        bde_group_id: groupId,
+                        credits_amount: parseFloat(creditsAmount),
+                        amount_eur: parseFloat(amountEur),
+                    });
+
+                if (markerErr) {
+                    const msg = (markerErr.message || '').toLowerCase();
+                    const looksLikeDuplicate = msg.includes('duplicate') || msg.includes('unique');
+                    if (looksLikeDuplicate) {
+                        // Already processed on a retry.
+                        logger.info('Stripe session already processed (marker duplicate)', { stripeSessionId });
+                        return res.json({ received: true, alreadyProcessed: true });
+                    }
+                    // Marker table might not exist yet: proceed with legacy fulfillment.
+                    logger.warn('Stripe marker insertion failed, proceeding without marker', { stripeSessionId, markerErr: markerErr.message });
+                }
+
+                // 1) Credit student's CREDITS wallet.
+                let { data: userWallet, error: userWalletErr } = await supabase
+                    .from('wallets')
+                    .select('wallet_id')
+                    .eq('user_id', userId)
+                    .eq('currency', 'CREDITS')
+                    .eq('status', 'active')
+                    .single();
+
+                if (userWalletErr || !userWallet) {
+                    const created = await walletService.createWallet(userId, groupId, 'CREDITS');
+                    userWallet = { wallet_id: created.wallet_id };
+                }
+
+                await walletService.updateBalance(null, userWallet.wallet_id, parseFloat(creditsAmount));
                 await supabase.from('transactions').insert({
                     transaction_id: uuidv4(),
-                    source_wallet_id: uuidv4(), // System/Null
-                    destination_wallet_id: userWallets.wallet_id,
+                    provider: 'stripe',
+                    provider_tx_id: `${stripeSessionId}:credits`,
+                    initiator_user_id: userId,
+                    source_wallet_id: null,
+                    destination_wallet_id: userWallet.wallet_id,
                     amount: parseFloat(creditsAmount),
                     currency: 'CREDITS',
-                    transaction_type: 'DEPOSIT',
+                    transaction_type: 'CASHIN',
+                    direction: 'incoming',
                     status: 'SUCCESS',
-                    description: 'Achat de crédits (Stripe)'
+                    description: 'Achat de credits (Stripe)'
                 });
-            }
 
-            // 2. Credit BDE's EUR Wallet
-            if (groupId) {
-                const { data: bdeWallets } = await supabase
+                // 2) Credit BDE EUR wallet (group wallet: user_id IS NULL).
+                let { data: bdeWallet, error: bdeWalletErr } = await supabase
                     .from('wallets')
                     .select('wallet_id')
                     .eq('group_id', groupId)
@@ -62,28 +123,44 @@ router.post('/stripe', async (req, res) => {
                     .eq('status', 'active')
                     .single();
 
-                if (bdeWallets) {
-                    await walletService.updateBalance(null, bdeWallets.wallet_id, parseFloat(amountEur));
+                if (bdeWalletErr || !bdeWallet) {
+                    const { data: createdBdeWallet, error: createErr } = await supabase
+                        .from('wallets')
+                        .insert({
+                            group_id: groupId,
+                            user_id: null,
+                            currency: 'EUR',
+                            balance: 0.00000000,
+                            status: 'active'
+                        })
+                        .select('wallet_id')
+                        .single();
 
-                    // Log transaction System -> BDE (EUR)
-                    await supabase.from('transactions').insert({
-                        transaction_id: uuidv4(),
-                        source_wallet_id: uuidv4(), // System/Null
-                        destination_wallet_id: bdeWallets.wallet_id,
-                        amount: parseFloat(amountEur),
-                        currency: 'EUR',
-                        transaction_type: 'DEPOSIT',
-                        status: 'SUCCESS',
-                        description: `Vente crédits: User ${userId}`
-                    });
+                    if (createErr) throw createErr;
+                    bdeWallet = createdBdeWallet;
                 }
-            }
 
-        } catch (error) {
-            logger.error('Error fulfilling order', error);
-            // Stripe will retry if we return 500, so maybe return 200 but log error
-            // Or return 500 to let Stripe retry
-            return res.status(500).send('Fulfillment Error');
+                await walletService.updateBalance(null, bdeWallet.wallet_id, parseFloat(amountEur));
+                await supabase.from('transactions').insert({
+                    transaction_id: uuidv4(),
+                    provider: 'stripe',
+                    provider_tx_id: `${stripeSessionId}:eur`,
+                    initiator_user_id: userId,
+                    source_wallet_id: null,
+                    destination_wallet_id: bdeWallet.wallet_id,
+                    amount: parseFloat(amountEur),
+                    currency: 'EUR',
+                    transaction_type: 'CASHIN',
+                    direction: 'incoming',
+                    status: 'SUCCESS',
+                    description: 'Vente credits (Stripe)'
+                });
+
+                return res.json({ received: true, fallback: true });
+            } catch (legacyError) {
+                logger.error('Legacy Stripe fulfillment failed', { stripeSessionId, error: legacyError.message });
+                return res.status(500).send('Fulfillment Error');
+            }
         }
     }
 

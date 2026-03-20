@@ -26,8 +26,8 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('user', JSON.stringify(data.user));
 
         showToast('Connexion réussie', 'success');
         setTimeout(() => window.location.href = '/', 1000);
@@ -42,7 +42,8 @@ document.getElementById('registerForm')?.addEventListener('submit', async (e) =>
     const fullName = document.getElementById('regName').value;
     const email = document.getElementById('regEmail').value;
     const password = document.getElementById('regPassword').value;
-    const role = document.getElementById('regRole').value;
+    // Security: registration endpoint only allows student role.
+    const role = 'student';
 
     try {
         const res = await fetch(`${API_BASE}/api/auth/register`, {

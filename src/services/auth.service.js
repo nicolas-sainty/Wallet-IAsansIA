@@ -4,12 +4,22 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
 const { supabase } = require('../config/database');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key_change_me';
+const {
+    getJwtSecret,
+    getJwtRefreshSecret,
+    getAccessTtl,
+    getRefreshTtl,
+} = require('../config/jwt');
 const SALT_ROUNDS = 10;
 
 class AuthService {
     async register(email, password, fullName, role = 'student') {
+        // Security: only allow public registration with safe roles.
+        const ALLOWED_PUBLIC_ROLES = ['student'];
+        if (!ALLOWED_PUBLIC_ROLES.includes(role)) {
+            throw new Error('Rôle non autorisé pour l\'inscription publique');
+        }
+
         // Check if email already exists
         const { data: existingUsers, error: checkError } = await supabase
             .from('users')
@@ -76,10 +86,10 @@ class AuthService {
             if (walletError) {
                 logger.error('Error creating wallet', walletError);
             } else {
-                logger.info(`Wallet created for user: ${userId}`);
+                logger.info(`Wallet created for user`, { userId });
             }
 
-            logger.info(`User registered: ${email} (${userId}) with BDE: ${bdeId}`);
+            logger.info(`User registered`, { userId, bdeId });
 
             return {
                 userId,
@@ -115,28 +125,39 @@ class AuthService {
         }
 
         if (!user.is_verified && process.env.REQUIRE_VERIFICATION === 'true') {
-            // Optional: Force verification
+            throw new Error('Email non vérifié. Veuillez vérifier votre email.');
         }
 
-        const token = jwt.sign(
+        const jwtSecret = getJwtSecret();
+
+        const accessToken = jwt.sign(
             {
                 userId: user.user_id,
                 email: user.email,
                 role: user.role
             },
-            JWT_SECRET,
-            { expiresIn: '24h' }
+            jwtSecret,
+            { expiresIn: getAccessTtl() }
         );
 
-        logger.info(`User logged in: ${email}`);
+        const refreshToken = jwt.sign(
+            {
+                userId: user.user_id,
+                type: 'refresh',
+            },
+            getJwtRefreshSecret(),
+            { expiresIn: getRefreshTtl() }
+        );
 
         return {
-            token,
+            token: accessToken,
+            refreshToken,
             user: {
                 userId: user.user_id,
                 email: user.email,
                 fullName: user.full_name,
-                role: user.role
+                role: user.role,
+                bde_id: user.bde_id
             }
         };
     }
@@ -156,6 +177,24 @@ class AuthService {
 
         if (!user) {
             throw new Error('Token de vérification invalide');
+        }
+
+        // Best-effort expiry without schema changes:
+        // Use user.created_at as a proxy for token creation time.
+        const ttlHours = parseInt(process.env.VERIFICATION_TOKEN_TTL_HOURS || '24', 10);
+        if (ttlHours > 0 && user.created_at) {
+            const createdAt = new Date(user.created_at).getTime();
+            const ageMs = Date.now() - createdAt;
+            const ttlMs = ttlHours * 60 * 60 * 1000;
+
+            if (ageMs > ttlMs) {
+                // Expired token: clear it to prevent reuse.
+                await supabase
+                    .from('users')
+                    .update({ verification_token: null })
+                    .eq('user_id', user.user_id);
+                throw new Error('Token de vérification expiré');
+            }
         }
 
         const { error: updateError } = await supabase

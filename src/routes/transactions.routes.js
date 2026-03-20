@@ -2,6 +2,7 @@ const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const transactionService = require('../services/transaction.service');
 const logger = require('../config/logger');
+const { requireAuth } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
@@ -138,15 +139,23 @@ router.post(
 
 router.post(
     '/pay',
+    requireAuth,
     [
-        body('userId').isUUID().withMessage('User ID required'),
+        body('userId').optional().isUUID().withMessage('User ID invalide'),
         body('groupId').isUUID().withMessage('Group (BDE) ID required'),
         body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be positive'),
     ],
     validate,
     async (req, res) => {
         try {
-            const { userId, groupId, amount } = req.body;
+            const { userId: clientUserId, groupId, amount } = req.body;
+
+            // Security: never trust userId coming from the client.
+            const userId = req.user.user_id;
+            if (clientUserId && clientUserId !== userId) {
+                return res.status(403).json({ error: 'userId manipulé' });
+            }
+
             const transaction = await transactionService.transferCredits(userId, groupId, amount);
 
             res.status(201).json({

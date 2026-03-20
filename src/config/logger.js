@@ -1,7 +1,23 @@
 const winston = require('winston');
 
+// PII Redaction: mask emails and sensitive patterns in log output
+const redactPII = winston.format((info) => {
+    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+    if (typeof info.message === 'string') {
+        info.message = info.message.replace(emailRegex, '[EMAIL_REDACTED]');
+    }
+    // Also redact in splat args if present
+    if (info[Symbol.for('splat')]) {
+        info[Symbol.for('splat')] = JSON.parse(
+            JSON.stringify(info[Symbol.for('splat')]).replace(emailRegex, '[EMAIL_REDACTED]')
+        );
+    }
+    return info;
+});
+
 const logFormat = winston.format.combine(
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    redactPII(),
     winston.format.errors({ stack: true }),
     winston.format.splat(),
     winston.format.json()

@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const logger = require('../config/logger');
@@ -24,27 +25,54 @@ app.use(helmet({
         directives: {
             ...helmet.contentSecurityPolicy.getDefaultDirectives(),
             "script-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            "script-src-attr": ["'unsafe-inline'"],
-            "connect-src": ["'self'", "https://fonts.googleapis.com"]
+            "script-src-attr": ["'self'"],
+            "connect-src": ["'self'", "https://fonts.googleapis.com", "https://checkout.stripe.com"]
         },
     },
 }));
 
 // CORS configuration
+const corsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()).filter(Boolean)
+    : null;
+const isProd = process.env.NODE_ENV === 'production';
+if (isProd && (!corsOrigins || corsOrigins.length === 0)) {
+    logger.error('CORS_ORIGIN est obligatoire en production. Arrêt du serveur.');
+    process.exit(1);
+}
 app.use(cors({
-    origin: process.env.CORS_ORIGIN?.split(',') || '*',
+    origin: corsOrigins || (isProd ? false : true),
     credentials: process.env.CORS_CREDENTIALS === 'true',
 }));
 
 // Rate limiting
-const limiter = rateLimit({
+const defaultLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    limit: 1000, // Relaxed limit for development
+    limit: 500, // Reasonable default
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     message: 'Too many requests from this IP, please try again later',
 });
-app.use('/api/', limiter);
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 100,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: 'Too many auth requests, please try again later',
+});
+
+const webhookLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 300,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: 'Too many webhook requests, please try again later',
+});
+
+app.use('/api/auth', authLimiter);
+app.use('/api/webhooks', webhookLimiter);
+app.use('/api/', defaultLimiter);
 
 // Body parsing and compression
 // Body parsing and compression
@@ -61,10 +89,13 @@ app.use(compression());
 
 // Request logging
 app.use((req, res, next) => {
+    const ipHash = req.ip
+        ? crypto.createHash('sha256').update(String(req.ip)).digest('hex')
+        : null;
     logger.info('Incoming request', {
         method: req.method,
         path: req.path,
-        ip: req.ip,
+        ip_hash: ipHash,
     });
     next();
 });

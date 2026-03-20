@@ -71,7 +71,8 @@ class EmailService {
     }
 
     async sendVerificationEmail(email, token) {
-        const verifyUrl = `http://localhost:3000/verify.html?token=${token}`;
+        const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+        const verifyUrl = `${baseUrl}/verify.html?token=${token}`;
         const html = `
             <h1>Bienvenue sur Student Wallet !</h1>
             <p>Merci de cliquer sur le lien ci-dessous pour vérifier votre compte :</p>

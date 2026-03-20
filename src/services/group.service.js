@@ -35,7 +35,8 @@ class GroupService {
                 .from('wallets')
                 .insert({
                     wallet_id: uuidv4(),
-                    user_id: adminUserId,
+                    // Group wallet: user_id must be NULL (others assume this convention).
+                    user_id: null,
                     group_id: groupId,
                     currency: 'EUR',
                     balance: 0.00000000,

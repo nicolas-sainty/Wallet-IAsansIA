@@ -17,40 +17,83 @@ const state = {
     currentFilter: 'all',
 };
 
+function migrateLocalStorageToSession() {
+    // Backward compatibility: move token/user once from localStorage to sessionStorage.
+    try {
+        const legacyToken = localStorage.getItem('token');
+        const legacyUser = localStorage.getItem('user');
+        if (legacyToken && !sessionStorage.getItem('token')) {
+            sessionStorage.setItem('token', legacyToken);
+        }
+        if (legacyUser && !sessionStorage.getItem('user')) {
+            sessionStorage.setItem('user', legacyUser);
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+migrateLocalStorageToSession();
+
 // ========================================
 // API Service
 // ========================================
 
 const api = {
-    async get(endpoint) {
-        const token = localStorage.getItem('token');
-        const headers = {};
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+    async fetchWithAuth(endpoint, options = {}, { retryOn401 = true } = {}) {
+        const getHeaders = () => {
+            const headers = { ...(options.headers || {}) };
+            const token = sessionStorage.getItem('token');
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            return headers;
+        };
+
+        let response = await fetch(`${API_BASE}${endpoint}`, {
+            ...options,
+            headers: getHeaders(),
+            cache: options.cache ?? 'no-store',
+            credentials: options.credentials ?? 'same-origin',
+        });
+
+        if (response.status === 401 && retryOn401) {
+            // Refresh access token via HttpOnly cookie.
+            const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            if (refreshRes.ok) {
+                const refreshData = await refreshRes.json();
+                if (refreshData?.token) sessionStorage.setItem('token', refreshData.token);
+                if (refreshData?.user) sessionStorage.setItem('user', JSON.stringify(refreshData.user));
+
+                response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers: getHeaders(),
+                    cache: options.cache ?? 'no-store',
+                    credentials: options.credentials ?? 'same-origin',
+                });
+            }
         }
 
-        const response = await fetch(`${API_BASE}${endpoint}`, { headers, cache: 'no-store' });
-        if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => null);
+            throw new Error(error?.error || error?.message || response.statusText);
+        }
+
         return await response.json();
     },
 
-    async post(endpoint, data) {
-        const token = localStorage.getItem('token');
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
+    async get(endpoint) {
+        return this.fetchWithAuth(endpoint, { method: 'GET' });
+    },
 
-        const response = await fetch(`${API_BASE}${endpoint}`, {
+    async post(endpoint, data) {
+        return this.fetchWithAuth(endpoint, {
             method: 'POST',
-            headers,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || response.statusText);
-        }
-        return await response.json();
     },
 };
 
@@ -105,7 +148,7 @@ function truncateId(id) {
 }
 
 function checkAuth() {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     return !!token;
 }
 
@@ -136,7 +179,7 @@ function updateNavAuth() {
 
 async function loadCardData() {
     try {
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         const nameEl = document.getElementById('userName');
         const roleEl = document.getElementById('userRoleBadge');
         if (nameEl) nameEl.textContent = user.email;
@@ -195,7 +238,7 @@ async function loadCardData() {
 
 async function loadGroupsForPay() {
     try {
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         const select = document.getElementById('payRecipientGroup');
         if (!select) return;
 
@@ -271,7 +314,7 @@ function closePayModal() {
 async function processPayment() {
     const amountEl = document.getElementById('payAmount');
     const groupEl = document.getElementById('payRecipientGroup');
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
     if (!amountEl || !groupEl) return;
 
@@ -330,7 +373,7 @@ function renderEvents() {
     }
 
     // Check user role
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     const isAdmin = user && (user.role === 'bde_admin' || user.role === 'admin');
 
     // Show create button for admins
@@ -436,7 +479,7 @@ function renderEvents() {
 
 // Helper function to check user's registration status for an event
 async function checkUserRegistrationStatus(eventId) {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user) return null;
 
     try {
@@ -451,7 +494,7 @@ async function checkUserRegistrationStatus(eventId) {
 }
 
 async function participateInEvent(eventId) {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user) {
         showToast('Connectez-vous d\'abord', 'error');
         return;
@@ -534,7 +577,7 @@ async function validateParticipation(participantId, status) {
 }
 
 async function buyProduct(productId) {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || user.role !== 'student') {
         showToast('Erreur: Seuls les étudiants peuvent acheter des crédits.', 'error');
         return;
@@ -624,7 +667,7 @@ async function init() {
 
     const path = window.location.pathname;
 
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
     // BDE Admin Layout Override
     if (isAuthenticated() && user && (user.role === 'bde_admin' || user.role === 'admin')) {

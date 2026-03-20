@@ -6,6 +6,33 @@
 const ADMIN_API_BASE = window.location.origin;
 window.currentBdeId = null;
 
+// Auth storage hardening: admin page script historically reads/writes localStorage.
+// Redirect auth keys to sessionStorage to avoid persistence and reduce token exposure.
+(function patchLocalStorageForAuthKeys() {
+    try {
+        const keys = new Set(['token', 'user']);
+        const ls = window.localStorage;
+        const originalGetItem = ls.getItem.bind(ls);
+        const originalSetItem = ls.setItem.bind(ls);
+        const originalRemoveItem = ls.removeItem.bind(ls);
+
+        ls.getItem = function (key) {
+            if (keys.has(key)) return sessionStorage.getItem(key);
+            return originalGetItem(key);
+        };
+        ls.setItem = function (key, value) {
+            if (keys.has(key)) return sessionStorage.setItem(key, value);
+            return originalSetItem(key, value);
+        };
+        ls.removeItem = function (key) {
+            if (keys.has(key)) return sessionStorage.removeItem(key);
+            return originalRemoveItem(key);
+        };
+    } catch (e) {
+        // If patching fails, we keep existing behavior.
+    }
+})();
+
 // ========================================
 // Initialization
 // ========================================
