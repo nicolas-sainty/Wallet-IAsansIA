@@ -214,7 +214,12 @@ async function loadCardData() {
             const txResult = await api.get(`/api/v2/wallets/${creditWallet.wallet_id}/transactions`);
             const txs = txResult.data || [];
             if (txs.length === 0) {
-                activityList.innerHTML = '<p class="empty-text">Aucune transaction.</p>';
+                activityList.innerHTML = `
+                    <div style="text-align:center; padding:1.5rem 0;">
+                        <i data-lucide="receipt" style="width:36px;height:36px;margin:0 auto 0.75rem;display:block;opacity:0.2;"></i>
+                        <p style="color:var(--text-muted); font-size:0.9rem;">Aucune transaction</p>
+                    </div>`;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
             } else {
                 activityList.innerHTML = txs.slice(0, 5).map(tx => `
                     <div style="display:flex; justify-content:space-between; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);">
@@ -271,15 +276,15 @@ async function loadHomeRequests() {
         if (requests.length > 0) {
             container.style.display = 'block';
             container.innerHTML = requests.map(r => `
-                <div class="glass-panel" style="padding: 1rem; margin-bottom: 0.5rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
+                <div class="glass-card" style="padding: 1rem; margin-bottom: 0.5rem; background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.2);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
                         <strong style="color:var(--color-orange);">Demande de Paiement</strong>
                         <span style="background:var(--color-orange); color:black; padding:2px 8px; border-radius:10px; font-weight:bold;">${r.amount} Pts</span>
                     </div>
                     <p style="margin:0 0 1rem 0; font-size:0.9rem;">${r.description || 'Paiement requis'}</p>
                     <div style="display:flex; gap:0.5rem;">
-                        <button class="btn-primary btn-respond-request" style="flex:1; padding:0.5rem;" data-id="${r.request_id}" data-action="PAY">Payer</button>
-                        <button class="btn-secondary btn-respond-request" style="flex:1; padding:0.5rem;" data-id="${r.request_id}" data-action="REJECT">Rejeter</button>
+                        <button class="btn btn-primary btn-sm btn-respond-request" style="flex:1;" data-id="${r.request_id}" data-action="PAY">Payer</button>
+                        <button class="btn btn-ghost btn-sm btn-respond-request" style="flex:1;" data-id="${r.request_id}" data-action="REJECT">Rejeter</button>
                     </div>
                 </div>
             `).join('');
@@ -365,10 +370,13 @@ function renderEvents() {
 
     if (state.events.length === 0) {
         container.innerHTML = `
-            <div class="glass" style="padding: 2rem; text-align: center; grid-column: 1 / -1;">
-                <p style="color: var(--text-secondary);">Aucun événement à venir</p>
+            <div class="glass-card" style="padding: 2.5rem 1.5rem; text-align: center; grid-column: 1 / -1;">
+                <i data-lucide="calendar-off" style="width:48px;height:48px;margin:0 auto 1rem;display:block;opacity:0.25;"></i>
+                <p style="color: var(--text-secondary); font-weight:500;">Aucun événement à venir</p>
+                <p style="color: var(--text-muted); font-size:0.85rem; margin-top:0.25rem;">Les prochains events apparaîtront ici</p>
             </div>
         `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
         return;
     }
 
@@ -426,7 +434,7 @@ function renderEvents() {
             if (status === 'OPEN') {
                 actionArea = `
                     <div id="${eventCardId}">
-                        <button class="btn-primary btn-participate" style="font-size: 1rem; padding: 1rem; width: 100%; justify-content: center;" 
+                        <button class="btn btn-primary w-full btn-participate" 
                                 data-event-id="${event.event_id}">
                             S'inscrire
                         </button>
@@ -438,11 +446,11 @@ function renderEvents() {
                     const actionEl = document.getElementById(eventCardId);
                     if (actionEl && regStatus) {
                         if (regStatus === 'pending') {
-                            actionEl.innerHTML = `<span style="background: #f59e0b; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">⏳ En attente de validation</span>`;
+                            actionEl.innerHTML = `<span class="badge badge-warning w-full py-3">En attente de validation</span>`;
                         } else if (regStatus === 'verified') {
-                            actionEl.innerHTML = `<span style="background: #10b981; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">✅ Présence validée</span>`;
+                            actionEl.innerHTML = `<span class="badge badge-success w-full py-3">Présence validée</span>`;
                         } else if (regStatus === 'rejected') {
-                            actionEl.innerHTML = `<span style="background: #ef4444; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">✗ Refusé</span>`;
+                            actionEl.innerHTML = `<span class="badge badge-error w-full py-3">Refusé</span>`;
                         }
                     }
                 }, 100);
@@ -457,24 +465,24 @@ function renderEvents() {
             }
         }
         return `
-        <div class="event-card">
-            <div class="event-image">
-                <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+        <div class="event-tile">
+            <i data-lucide="calendar" class="bg-icon"></i>
+            <div class="event-banner">
+                <i data-lucide="calendar" style="width:36px;height:36px;opacity:0.6;"></i>
             </div>
-            <div class="event-content">
+            <div class="event-body">
                 <div class="event-date">${formatDate(event.event_date)}${statusBadge}</div>
                 <h3 class="event-title">${event.title}</h3>
-                <p class="event-description">${event.description || 'Pas de description'}</p>
-                <div class="event-footer">
-                    <span class="event-reward">+${event.reward_points} pts</span>
+                <p class="event-desc">${event.description || 'Pas de description'}</p>
+                <div class="event-foot">
+                    <span class="badge-reward">+${event.reward_points} pts</span>
                     <div style="flex: 1;">${actionArea}</div>
                 </div>
                 ${participantsSection}
             </div>
         </div>
     `}).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // Helper function to check user's registration status for an event
@@ -518,7 +526,7 @@ async function participateInEvent(eventId) {
 
     try {
         await api.post(`/api/v2/events/${eventId}/participate`, {});
-        actionContainer.innerHTML = `<span style="background: #10b981; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">✅ Présence validée</span>`;
+        actionContainer.innerHTML = `<span class="badge badge-success w-full py-3">Présence validée</span>`;
         showToast('Inscription réussie !', 'success');
 
         // Reload events after a short delay to show success state
@@ -554,8 +562,8 @@ async function loadEventParticipants(eventId) {
                     <span style="font-weight: 600; font-size: 0.9rem;">${p.user_name}</span>
                 </div>
                 <div style="display: flex; gap: 0.2rem;">
-                    <button class="btn-validate" style="background: #10b981; border: none; border-radius: 4px; cursor: pointer; padding: 2px 6px;" data-id="${p.participant_id}" data-status="verified">✔</button>
-                    <button class="btn-validate" style="background: #ef4444; border: none; border-radius: 4px; cursor: pointer; padding: 2px 6px;" data-id="${p.participant_id}" data-status="rejected">✖</button>
+                    <button class="btn btn-success btn-xs btn-validate" data-id="${p.participant_id}" data-status="verified"><i data-lucide="check" class="w-3 h-3"></i></button>
+                    <button class="btn btn-error btn-xs btn-validate" data-id="${p.participant_id}" data-status="rejected"><i data-lucide="x" class="w-3 h-3"></i></button>
                 </div>
             </div>
         `).join('');
@@ -652,7 +660,7 @@ async function createEvent() {
 // ========================================
 
 async function init() {
-    console.log('🚀 Initializing Student Wallet (Mobile)...');
+    console.log('Initializing Student Wallet (Mobile)...');
 
     updateNavAuth();
 
@@ -710,30 +718,31 @@ async function init() {
     if (isAuthenticated() && user && (user.role === 'bde_admin' || user.role === 'admin')) {
 
         // 2. Override Bottom Nav
-        const nav = document.querySelector('.bottom-nav');
+        const nav = document.querySelector('.bottom-bar');
         if (nav) {
             nav.innerHTML = `
-                <a href="/admin.html" class="nav-item ${path.includes('admin.html') ? 'active' : ''}">
-                    <span style="font-size:1.2rem;">📊</span>
+                <a href="/admin.html" class="${path.includes('admin.html') && !path.includes('admin-') ? 'active' : ''}">
+                    <i data-lucide="layout-dashboard"></i>
                     <span>Dashboard</span>
                 </a>
-                <a href="/admin-students.html" class="nav-item ${path.includes('admin-students.html') ? 'active' : ''}">
-                    <span style="font-size:1.2rem;">👥</span>
+                <a href="/admin-students.html" class="${path.includes('admin-students.html') ? 'active' : ''}">
+                    <i data-lucide="users"></i>
                     <span>Étudiants</span>
                 </a>
-                <a href="/admin-events.html" class="nav-item ${path.includes('admin-events.html') ? 'active' : ''}">
-                    <span style="font-size:1.2rem;">📅</span>
+                <a href="/admin-events.html" class="${path.includes('admin-events.html') ? 'active' : ''}">
+                    <i data-lucide="calendar"></i>
                     <span>Events</span>
                 </a>
-                 <a href="/admin-finances.html" class="nav-item ${path.includes('admin-finances.html') ? 'active' : ''}">
-                    <span style="font-size:1.2rem;">💰</span>
+                <a href="/admin-finances.html" class="${path.includes('admin-finances.html') ? 'active' : ''}">
+                    <i data-lucide="wallet"></i>
                     <span>Finances</span>
                 </a>
-                <a href="/profile.html" class="nav-item ${path.includes('profile.html') ? 'active' : ''}">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                <a href="/profile.html" class="${path.includes('profile.html') ? 'active' : ''}">
+                    <i data-lucide="user"></i>
                     <span>Profil</span>
                 </a>
             `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
 

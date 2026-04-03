@@ -1,87 +1,42 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Politique de Confidentialité — Student Wallet</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/index.css">
-    <style>
-        body {
-            margin: 0;
-            background: linear-gradient(135deg, #111827 0%, #000000 100%);
-            color: #e5e7eb;
-            font-family: 'Outfit', sans-serif;
-            min-height: 100vh;
-        }
-
-        .privacy-container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 2rem 1.5rem 4rem;
-        }
-
-        h1 {
-            color: white;
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
-        }
-
-        h2 {
-            color: #a78bfa;
-            font-size: 1.3rem;
-            margin-top: 2rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 0.5rem;
-        }
-
-        p, li {
-            line-height: 1.7;
-            color: #d1d5db;
-        }
-
-        a {
-            color: #818cf8;
-        }
-
-        .back-btn {
-            display: inline-block;
-            margin-top: 2rem;
-            padding: 10px 20px;
-            background: #4f46e5;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-        }
-
-        .updated {
-            color: #9ca3af;
-            font-size: 0.9rem;
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/css/theme.css">
 </head>
 
-<body>
-    <div class="privacy-container">
-        <h1>🔒 Politique de Confidentialité</h1>
-        <p class="updated">Dernière mise à jour : 20 mars 2026</p>
+<body class="page-privacy">
+    <div class="orb-canvas" aria-hidden="true">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="orb orb-c"></div>
+    </div>
 
-        <h2>1. Responsable du traitement</h2>
-        <p>Le responsable du traitement des données est l'administrateur de la plateforme Student Wallet (Wallet-IAsansIA). Pour toute question relative à vos données personnelles, contactez-nous à l'adresse indiquée dans la section Contact.</p>
+    <div class="max-w-3xl mx-auto px-5 py-8 relative z-1">
+        <h1 class="text-3xl font-bold mb-1">Politique de Confidentialité</h1>
+        <p class="text-sm opacity-40 mb-8">Dernière mise à jour : 20 mars 2026</p>
 
-        <h2>2. Données collectées</h2>
-        <p>Nous collectons les données suivantes lors de votre inscription et utilisation du service :</p>
-        <ul>
+        <h2 class="text-lg font-semibold mt-6 mb-2 pb-2 border-b border-white/10">1. Responsable du traitement</h2>
+        <p class="opacity-70 leading-relaxed">Le responsable du traitement des données est l'administrateur de la plateforme Student Wallet (Wallet-IAsansIA). Pour toute question relative à vos données personnelles, contactez-nous à l'adresse indiquée dans la section Contact.</p>
+
+        <h2 class="text-lg font-semibold mt-6 mb-2 pb-2 border-b border-white/10">2. Données collectées</h2>
+        <p class="opacity-70 mb-2">Nous collectons les données suivantes lors de votre inscription et utilisation du service :</p>
+        <ul class="list-disc list-inside opacity-70 space-y-1">
             <li><strong>Identité</strong> : nom complet, adresse email</li>
             <li><strong>Authentification</strong> : mot de passe (stocké sous forme hachée, jamais en clair)</li>
             <li><strong>Transactions</strong> : historique des opérations de wallet (montants, dates, descriptions)</li>
             <li><strong>Données techniques</strong> : hash de l'adresse IP (anonymisée), logs d'accès</li>
         </ul>
 
-        <h2>3. Finalités du traitement</h2>
-        <ul>
+        <h2 class="text-lg font-semibold mt-6 mb-2 pb-2 border-b border-white/10">3. Finalités du traitement</h2>
+        <ul class="list-disc list-inside opacity-70 space-y-1">
             <li>Gestion de votre compte utilisateur et authentification</li>
             <li>Traitement des transactions de crédits et paiements</li>
             <li>Gestion des événements et participations</li>
@@ -89,33 +44,33 @@
             <li>Amélioration du service</li>
         </ul>
 
-        <h2>4. Base légale</h2>
-        <p>Le traitement de vos données repose sur :</p>
-        <ul>
+        <h2 class="text-lg font-semibold mt-6 mb-2 pb-2 border-b border-white/10">4. Base légale</h2>
+        <p class="opacity-70 mb-2">Le traitement de vos données repose sur :</p>
+        <ul class="list-disc list-inside opacity-70 space-y-1">
             <li><strong>L'exécution du contrat</strong> : nécessaire pour fournir le service de wallet</li>
             <li><strong>L'intérêt légitime</strong> : sécurité et prévention de la fraude</li>
             <li><strong>Votre consentement</strong> : donné lors de l'inscription</li>
         </ul>
 
-        <h2>5. Durée de conservation</h2>
-        <ul>
+        <h2 class="text-lg font-semibold mt-6 mb-2 pb-2 border-b border-white/10">5. Durée de conservation</h2>
+        <ul class="list-disc list-inside opacity-70 space-y-1">
             <li><strong>Données de compte</strong> : conservées tant que le compte est actif</li>
             <li><strong>Transactions</strong> : conservées 5 ans (obligations légales)</li>
             <li><strong>Logs techniques</strong> : conservés 90 jours maximum</li>
         </ul>
 
-        <h2>6. Vos droits (RGPD)</h2>
-        <p>Conformément au Règlement Général sur la Protection des Données, vous disposez des droits suivants :</p>
-        <ul>
-            <li><strong>Droit d'accès</strong> : obtenir une copie de vos données via l'API <code>/api/auth/me/export</code></li>
+        <h2 class="text-lg font-semibold mt-6 mb-2 pb-2 border-b border-white/10">6. Vos droits (RGPD)</h2>
+        <p class="opacity-70 mb-2">Conformément au Règlement Général sur la Protection des Données, vous disposez des droits suivants :</p>
+        <ul class="list-disc list-inside opacity-70 space-y-1">
+            <li><strong>Droit d'accès</strong> : obtenir une copie de vos données via l'API <code class="bg-white/10 px-1 rounded">/api/auth/me/export</code></li>
             <li><strong>Droit de rectification</strong> : modifier vos informations personnelles via votre profil</li>
-            <li><strong>Droit à l'effacement</strong> : supprimer votre compte et toutes les données associées via <code>DELETE /api/auth/me</code></li>
+            <li><strong>Droit à l'effacement</strong> : supprimer votre compte et toutes les données associées via <code class="bg-white/10 px-1 rounded">DELETE /api/auth/me</code></li>
             <li><strong>Droit à la portabilité</strong> : exporter vos données dans un format structuré (JSON)</li>
             <li><strong>Droit d'opposition</strong> : vous opposer au traitement de vos données</li>
         </ul>
 
-        <h2>7. Sécurité</h2>
-        <ul>
+        <h2 class="text-lg font-semibold mt-6 mb-2 pb-2 border-b border-white/10">7. Sécurité</h2>
+        <ul class="list-disc list-inside opacity-70 space-y-1">
             <li>Mots de passe hachés avec bcrypt (10 rounds)</li>
             <li>Authentification par JWT avec tokens à durée limitée</li>
             <li>Chiffrement HTTPS en transit</li>
@@ -123,17 +78,22 @@
             <li>Rate limiting pour prévenir les abus</li>
         </ul>
 
-        <h2>8. Sous-traitants</h2>
-        <ul>
+        <h2 class="text-lg font-semibold mt-6 mb-2 pb-2 border-b border-white/10">8. Sous-traitants</h2>
+        <ul class="list-disc list-inside opacity-70 space-y-1">
             <li><strong>Supabase</strong> : hébergement de la base de données (UE)</li>
             <li><strong>Stripe</strong> : traitement des paiements par carte bancaire</li>
         </ul>
 
-        <h2>9. Contact</h2>
-        <p>Pour exercer vos droits ou pour toute question relative à cette politique, contactez l'administrateur de la plateforme.</p>
+        <h2 class="text-lg font-semibold mt-6 mb-2 pb-2 border-b border-white/10">9. Contact</h2>
+        <p class="opacity-70 mb-6">Pour exercer vos droits ou pour toute question relative à cette politique, contactez l'administrateur de la plateforme.</p>
 
-        <a href="/" class="back-btn">← Retour à l'accueil</a>
+        <a href="/" class="btn btn-primary">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Retour à l'accueil
+        </a>
     </div>
+
+    <script>lucide.createIcons();</script>
 </body>
 
 </html>

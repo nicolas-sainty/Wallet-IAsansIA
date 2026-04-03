@@ -1,69 +1,49 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Paiement Réussi</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/index.css">
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background: linear-gradient(135deg, #111827 0%, #000000 100%);
-            color: white;
-            font-family: 'Outfit', sans-serif;
-        }
-
-        .container {
-            text-align: center;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 2rem;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            max-width: 90%;
-            width: 400px;
-        }
-
-        h1 {
-            color: #10b981;
-        }
-
-        .btn {
-            display: inline-block;
-            margin-top: 1rem;
-            padding: 10px 20px;
-            background: #4f46e5;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/css/theme.css">
 </head>
 
-<body>
-    <div class="container">
-        <div style="font-size: 4rem; margin-bottom: 1rem;">🎉</div>
-        <h1 id="status-title">Vérification...</h1>
-        <p id="status-message">Veuillez patienter pendant que nous validons votre paiement.</p>
-        <a href="/" class="btn" id="home-btn" style="display: none;">Retour à l'accueil</a>
+<body class="page-shop">
+    <div class="orb-canvas" aria-hidden="true">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="orb orb-c"></div>
+    </div>
+
+    <div class="flex justify-center items-center min-h-screen px-4 relative z-1">
+        <div class="glass-card text-center max-w-sm w-full">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
+                <i data-lucide="party-popper" class="w-8 h-8 text-green-400"></i>
+            </div>
+            <h1 id="status-title" class="text-xl font-bold mb-2">Vérification...</h1>
+            <p id="status-message" class="text-sm opacity-60 mb-4">Veuillez patienter pendant que nous validons votre paiement.</p>
+            <a href="/" class="btn btn-primary" id="home-btn" style="display: none;">
+                <i data-lucide="home" class="w-4 h-4"></i>
+                Retour à l'accueil
+            </a>
+        </div>
     </div>
 
     <script>
+        lucide.createIcons();
+
         async function verifyPayment() {
             const urlParams = new URLSearchParams(window.location.search);
             const sessionId = urlParams.get('session_id');
 
             if (!sessionId) {
                 document.getElementById('status-title').textContent = 'Erreur';
-                document.getElementById('status-title').style.color = '#ef4444';
                 document.getElementById('status-message').textContent = 'Session ID manquant.';
-                document.getElementById('home-btn').style.display = 'inline-block';
+                document.getElementById('home-btn').style.display = 'inline-flex';
                 return;
             }
 
@@ -80,16 +60,13 @@
                     document.getElementById('status-message').textContent = 'Vos crédits ont été ajoutés à votre wallet.';
                 } else {
                     document.getElementById('status-title').textContent = 'Paiement non confirmé';
-                    document.getElementById('status-title').style.color = 'orange';
                     document.getElementById('status-message').textContent = data.message || 'Le paiement n\'est pas encore validé.';
                 }
             } catch (error) {
-                console.error(error);
                 document.getElementById('status-title').textContent = 'Erreur';
-                document.getElementById('status-title').style.color = '#ef4444';
                 document.getElementById('status-message').textContent = 'Impossible de vérifier le paiement.';
             } finally {
-                document.getElementById('home-btn').style.display = 'inline-block';
+                document.getElementById('home-btn').style.display = 'inline-flex';
             }
         }
 
