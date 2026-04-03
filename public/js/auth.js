@@ -36,28 +36,30 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     }
 });
 
-// Register
+// Register BDE
 document.getElementById('registerForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const fullName = document.getElementById('regName').value;
+    const bdeName = document.getElementById('regBdeName').value;
+    const fullName = document.getElementById('regFullName').value;
     const email = document.getElementById('regEmail').value;
     const password = document.getElementById('regPassword').value;
-    // Security: registration endpoint only allows student role.
-    const role = 'student';
 
     try {
-        const res = await fetch(`${API_BASE}/api/v2/auth/register`, {
+        const res = await fetch(`${API_BASE}/api/v2/auth/bde/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fullName, email, password, role })
+            body: JSON.stringify({ bdeName, fullName, email, password })
         });
 
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        showToast('Compte créé ! Vérifiez votre email ou connectez-vous.', 'success');
+        showToast('BDE créé avec succès ! Connectez-vous.', 'success');
         // Switch to login tab
-        document.querySelector('[data-target="loginLink"]').click();
+        setTimeout(() => {
+            const loginTab = document.querySelector('[data-target="loginLink"]');
+            if (loginTab) loginTab.click();
+        }, 1500);
     } catch (error) {
         showToast(error.message, 'error');
     }

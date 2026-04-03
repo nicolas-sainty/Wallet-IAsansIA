@@ -239,8 +239,13 @@ async function loadStudents() {
 }
 
 async function addStudent() {
+    const nameEl = document.getElementById('newStudentName');
     const emailEl = document.getElementById('newStudentEmail');
+    const passEl = document.getElementById('newStudentPassword');
+    
+    const fullName = nameEl.value;
     const email = emailEl.value;
+    const password = passEl.value;
 
     console.log(`Add Student clicked. Email: ${email}, BDE: ${window.currentBdeId}`);
 
@@ -248,23 +253,28 @@ async function addStudent() {
         alert("Erreur critique: ID du BDE non chargé. Rechargez la page.");
         return;
     }
-    if (!email) {
-        alert("Veuillez entrer un email.");
+    if (!email || !fullName || !password) {
+        alert("Veuillez remplir tous les champs (Nom, Email, Mot de passe).");
         return;
     }
 
     try {
-        const res = await fetch(`${ADMIN_API_BASE}/api/groups/${window.currentBdeId}/students`, {
+        const res = await fetch(`${ADMIN_API_BASE}/api/v2/auth/bde/members`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-            body: JSON.stringify({ email })
+            headers: { 
+                'Content-Type': 'application/json', 
+                'Authorization': `Bearer ${sessionStorage.getItem('token')}` 
+            },
+            body: JSON.stringify({ email, fullName, password })
         });
 
         const data = await res.json();
 
-        if (res.ok) {
-            alert(`Étudiant ajouté avec succès !\nConnecté à : ${data.userId || 'User'}`);
+        if (res.status === 201) {
+            alert(`Accès étudiant créé avec succès !`);
+            nameEl.value = '';
             emailEl.value = '';
+            passEl.value = '';
             loadStudents();
         } else {
             console.error("Add Student API Error:", data);

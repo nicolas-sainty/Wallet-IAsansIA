@@ -23,7 +23,8 @@ class GroupController {
             const groups = await this.getGroupsUseCase.execute();
             const data = groups.map(g => ({
                 group_id: g.groupId,
-                group_name: g.name,
+                group_name: g.groupName,
+                admin_user_id: g.adminUserId,
                 group_type: g.type,
                 status: g.status,
                 created_at: g.createdAt
@@ -42,7 +43,8 @@ class GroupController {
             
             const data = {
                 group_id: group.groupId,
-                group_name: group.name,
+                group_name: group.groupName,
+                admin_user_id: group.adminUserId,
                 group_type: group.type,
                 status: group.status,
                 created_at: group.createdAt

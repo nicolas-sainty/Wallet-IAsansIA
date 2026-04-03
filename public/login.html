@@ -26,13 +26,13 @@
 
     <div class="flex justify-center px-4 pt-16 relative z-1">
         <div class="glass-card w-full max-w-md">
-            <h1 class="text-2xl font-bold mb-1">Bienvenue</h1>
-            <p class="text-sm opacity-50 mb-6">Connecte-toi pour accéder à tes points</p>
+            <h1 class="text-2xl font-bold mb-1">Portail Epicoin</h1>
+            <p class="text-sm opacity-50 mb-6">Gère tes points et tes événements</p>
 
             <!-- Tabs -->
             <div role="tablist" class="tabs tabs-bordered mb-6">
                 <button role="tab" class="tab tab-active" data-target="loginLink">Connexion</button>
-                <button role="tab" class="tab" data-target="registerLink">Inscription</button>
+                <button role="tab" class="tab" data-target="registerLink">Enregistrer un BDE</button>
             </div>
 
             <!-- Login -->
@@ -50,31 +50,30 @@
                 <button type="submit" class="btn btn-primary w-full">Se Connecter</button>
             </form>
 
-            <!-- Register -->
+            <!-- Register BDE -->
             <form id="registerForm" style="display: none;">
                 <div class="form-control mb-3">
-                    <label class="label"><span class="label-text text-white">Nom complet</span></label>
-                    <input type="text" id="regName" required
+                    <label class="label"><span class="label-text text-white">Nom du BDE / École</span></label>
+                    <input type="text" id="regBdeName" placeholder="ex: BDE Epitech Paris" required
                         class="input input-bordered w-full bg-white/5 border-white/10">
                 </div>
                 <div class="form-control mb-3">
-                    <label class="label"><span class="label-text text-white">Email étudiant</span></label>
-                    <input type="email" id="regEmail" required
+                    <label class="label"><span class="label-text text-white">Nom de l'administrateur</span></label>
+                    <input type="text" id="regFullName" placeholder="Ton nom" required
                         class="input input-bordered w-full bg-white/5 border-white/10">
                 </div>
                 <div class="form-control mb-3">
+                    <label class="label"><span class="label-text text-white">Email (Contact BDE)</span></label>
+                    <input type="email" id="regEmail" placeholder="admin@bde.fr" required
+                        class="input input-bordered w-full bg-white/5 border-white/10">
+                </div>
+                <div class="form-control mb-4">
                     <label class="label"><span class="label-text text-white">Mot de passe</span></label>
                     <input type="password" id="regPassword" required minlength="6"
                         class="input input-bordered w-full bg-white/5 border-white/10">
                 </div>
-                <div class="form-control mb-4">
-                    <label class="label"><span class="label-text text-white">Type de compte</span></label>
-                    <select id="regRole" class="select select-bordered w-full bg-white/5 border-white/10">
-                        <option value="student">Étudiant</option>
-                        <option value="bde_admin">Membre BDE (Admin)</option>
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-primary w-full">Créer mon compte</button>
+                <button type="submit" class="btn btn-primary w-full">Créer le BDE</button>
+                <p class="text-[10px] opacity-40 mt-4 text-center">Les comptes étudiants sont créés directement par l'administrateur du BDE.</p>
             </form>
         </div>
     </div>
