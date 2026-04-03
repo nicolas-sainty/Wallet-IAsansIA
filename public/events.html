@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
@@ -7,63 +7,61 @@
     <title>Events - Student Wallet</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/css/index.css">
-    <link rel="stylesheet" href="/css/mobile.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/css/theme.css">
 </head>
 
-<body>
-    <div class="app-container">
-        <main class="main-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h1 style="margin: 0;">Événements</h1>
-                <button class="btn-primary" id="createEventBtn"
-                    style="width: auto; padding: 8px 16px; font-size: 0.9rem; display: none;">
-                    + Créer
+<body class="page-events">
+    <div class="orb-canvas" aria-hidden="true">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="orb orb-c"></div>
+    </div>
+
+    <div class="app-shell">
+        <div class="page-content">
+            <div class="flex justify-between items-center mb-2">
+                <h1 class="text-2xl font-bold">Événements</h1>
+                <button class="btn btn-primary btn-sm gap-1" id="createEventBtn" style="display: none;">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    Créer
                 </button>
             </div>
 
-            <div id="eventsGrid" class="events-grid">
-                <div class="empty-state">
-                    <p>Chargement des événements...</p>
-                </div>
+            <div id="eventsGrid" class="grid-cards">
+                <div class="skeleton-event"><div class="skeleton-banner"></div><div class="skeleton-body"><div class="skeleton-line skel-w-33"></div><div class="skeleton-line skel-h-6 skel-w-75"></div><div class="skeleton-line skel-w-full"></div><div class="skeleton-line skel-w-66"></div></div></div>
+                <div class="skeleton-event"><div class="skeleton-banner"></div><div class="skeleton-body"><div class="skeleton-line skel-w-33"></div><div class="skeleton-line skel-h-6 skel-w-75"></div><div class="skeleton-line skel-w-full"></div><div class="skeleton-line skel-w-66"></div></div></div>
+                <div class="skeleton-event"><div class="skeleton-banner"></div><div class="skeleton-body"><div class="skeleton-line skel-w-33"></div><div class="skeleton-line skel-h-6 skel-w-75"></div><div class="skeleton-line skel-w-full"></div><div class="skeleton-line skel-w-66"></div></div></div>
             </div>
-        </main>
+        </div>
 
         <div id="toastContainer" class="toast-container"></div>
 
-        <!-- Bottom Navigation -->
-        <nav class="bottom-nav glass-nav">
-            <a href="/shop.html" class="nav-item">
-                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
+        <!-- Bottom Nav -->
+        <nav class="bottom-bar">
+            <a href="/shop.html">
+                <i data-lucide="shopping-bag"></i>
                 <span>Shop</span>
             </a>
-            <a href="/events.html" class="nav-item active">
-                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+            <a href="/events.html" class="active">
+                <i data-lucide="calendar"></i>
                 <span>Events</span>
             </a>
-            <a href="/" class="nav-item">
-                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
+            <a href="/">
+                <i data-lucide="credit-card"></i>
                 <span>Carte</span>
             </a>
-            <a href="/profile.html" class="nav-item">
-                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+            <a href="/profile.html">
+                <i data-lucide="user"></i>
                 <span>Profil</span>
             </a>
         </nav>
     </div>
+
     <script src="/js/app.js"></script>
+    <script>lucide.createIcons();</script>
 </body>
 
 </html>

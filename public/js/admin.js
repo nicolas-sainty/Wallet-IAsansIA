@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const closeBtn = document.getElementById('closeParticipantsModalBtn');
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
-                document.getElementById('participantsModal').style.display = 'none';
+                document.getElementById('participantsModal').classList.add('hidden');
             });
         }
 
@@ -143,16 +143,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Modal Listeners
     window.onclick = function (event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = "none";
+        if (event.target.classList.contains('modal-overlay')) {
+            event.target.classList.add('hidden');
         }
     }
 });
 
 // Modal Listeners
 window.onclick = function (event) {
-    if (event.target.classList.contains('modal')) {
-        event.target.style.display = "none";
+    if (event.target.classList.contains('modal-overlay')) {
+        event.target.classList.add('hidden');
     }
 }
 
@@ -333,7 +333,7 @@ async function createAdminEvent() {
 
 async function openParticipantsModal(eventId) {
     window.currentEventId = eventId;
-    document.getElementById('participantsModal').style.display = 'block';
+    document.getElementById('participantsModal').classList.remove('hidden');
     const container = document.getElementById('participantsListCtx');
     container.innerHTML = "Chargement...";
 
@@ -353,11 +353,12 @@ async function openParticipantsModal(eventId) {
             <div class="participant-row">
                 <span>${p.user_name || 'User'} (${p.user_email})</span>
                 <div>
-                     <button class="btn-icon check btn-validate-part" data-part-id="${p.participant_id}" data-status="verified">✔</button>
-                     <button class="btn-icon cross btn-validate-part" data-part-id="${p.participant_id}" data-status="rejected">✘</button>
+                     <button class="btn btn-success btn-xs btn-circle btn-validate-part" data-part-id="${p.participant_id}" data-status="verified"><i data-lucide="check" class="w-3 h-3"></i></button>
+                     <button class="btn btn-error btn-xs btn-circle btn-validate-part" data-part-id="${p.participant_id}" data-status="rejected"><i data-lucide="x" class="w-3 h-3"></i></button>
                 </div>
             </div>
         `).join('');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
 
     } catch (e) { container.innerHTML = "Erreur."; }
 }
@@ -383,7 +384,7 @@ async function validatePart(pId, status) {
         if (window.currentEventId) {
             openParticipantsModal(window.currentEventId);
         } else {
-            document.getElementById('participantsModal').style.display = 'none';
+            document.getElementById('participantsModal').classList.add('hidden');
         }
     } catch (e) { alert("Erreur"); }
 }
