@@ -38,12 +38,10 @@ window.currentBdeId = null;
 // ========================================
 
 document.addEventListener("DOMContentLoaded", async () => {
-    // Check Auth
-    // Check Auth
+    // Check Auth — only require a logged-in user (no role restriction)
     const userStored = JSON.parse(localStorage.getItem('user'));
-    if (!userStored || userStored.role !== 'bde_admin') {
-        alert("Accès refusé. Réservé aux administrateurs BDE.");
-        window.location.href = '/';
+    if (!userStored) {
+        window.location.href = '/login.html';
         return;
     }
 
@@ -209,18 +207,22 @@ async function loadStudents() {
         const members = (await res.json()).data;
 
         if (!members || members.length === 0) {
-            if (list) list.innerHTML = '<p class="text-muted">Aucun étudiant membre pour le moment.</p>';
-            // Don't return, allow select population (might be empty but that's fine)
+            if (list) list.innerHTML = '<div class="empty-state"><i data-lucide="users" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucun étudiant membre pour le moment.</p></div>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         } else {
             if (list) {
-                list.innerHTML = members.map(m => `
-                    <div class="list-item">
-                        <div class="item-info">
-                        <strong>${m.full_name || m.email}</strong> <small class="text-muted">(${truncateId(m.user_id)})</small>
-                        <span class="sub-text">Balance: ${parseFloat(m.balance).toFixed(2)} ${m.currency}</span>
+                list.innerHTML = members.map(m => {
+                    const initials = (m.full_name || m.email || '??').substring(0, 2).toUpperCase();
+                    return `
+                    <div class="admin-list-item">
+                        <div class="item-avatar">${initials}</div>
+                        <div class="item-body">
+                            <div class="item-name">${m.full_name || m.email}</div>
+                            <div class="item-sub">${truncateId(m.user_id)}</div>
                         </div>
-                    </div>
-                `).join('');
+                        <span class="item-badge balance">${parseFloat(m.balance).toFixed(2)} ${m.currency}</span>
+                    </div>`;
+                }).join('');
             }
         }
 
@@ -300,17 +302,29 @@ async function loadAdminEvents() {
     const myEvents = events.filter(e => e.group_id === currentBdeId);
 
     const list = document.getElementById('adminEventsList');
-    list.innerHTML = myEvents.map(e => `
-        <div class="list-item">
-            <div class="item-info">
-                <strong>${e.title}</strong>
-                <span class="sub-text">${e.status} | ${new Date(e.event_date).toLocaleDateString()}</span>
+    if (myEvents.length === 0) {
+        list.innerHTML = '<div class="empty-state"><i data-lucide="calendar-off" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucun événement pour le moment.</p></div>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+    }
+    list.innerHTML = myEvents.map(e => {
+        const statusColor = e.status === 'OPEN' ? 'background:rgba(34,197,94,0.1);color:#22c55e' : 'background:rgba(255,255,255,0.06);color:var(--text-muted)';
+        return `
+        <div class="admin-list-item">
+            <div class="item-avatar" style="border-radius:var(--radius-md);background:rgba(139,92,246,0.1);color:#8b5cf6">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
             </div>
-            <div class="item-actions">
-                <button class="btn-sm btn-participants" data-event-id="${e.event_id}">Participants</button>
+            <div class="item-body">
+                <div class="item-name">${e.title}</div>
+                <div class="item-sub">${new Date(e.event_date).toLocaleDateString('fr-FR', {day:'numeric',month:'short',year:'numeric'})}</div>
             </div>
-        </div>
-    `).join('');
+            <span class="item-badge" style="${statusColor}">${e.status}</span>
+            <button class="btn btn-ghost btn-xs btn-circle btn-participants" data-event-id="${e.event_id}" title="Voir participants">
+                <i data-lucide="users" class="w-4 h-4"></i>
+            </button>
+        </div>`;
+    }).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 async function createAdminEvent() {
@@ -417,14 +431,26 @@ async function loadPaymentRequests() {
         const requests = (await res.json()).data;
 
         const list = document.getElementById('paymentRequestsList');
-        list.innerHTML = requests.map(r => `
-            <div class="list-item">
-                <div class="item-info">
-                    <strong>${r.amount} pts</strong> vers ${r.full_name || r.email || r.student_user_id}
-                    <span class="sub-text">${r.description} | ${r.status}</span>
+        if (!requests || requests.length === 0) {
+            list.innerHTML = '<div class="empty-state"><i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucune demande en attente.</p></div>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            return;
+        }
+        list.innerHTML = requests.map(r => {
+            const statusStyle = r.status === 'pending' ? 'background:rgba(245,158,11,0.1);color:#f59e0b' : 'background:rgba(34,197,94,0.1);color:#22c55e';
+            return `
+            <div class="admin-list-item">
+                <div class="item-avatar" style="background:rgba(59,130,246,0.1);color:#3b82f6">
+                    <i data-lucide="receipt" class="w-5 h-5"></i>
                 </div>
-            </div>
-        `).join('');
+                <div class="item-body">
+                    <div class="item-name">${r.full_name || r.email || truncateId(r.student_user_id)}</div>
+                    <div class="item-sub">${r.description || 'Paiement'}</div>
+                </div>
+                <span class="item-badge" style="${statusStyle}">${r.amount} pts &middot; ${r.status}</span>
+            </div>`;
+        }).join('');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     } catch (e) { console.error(e); }
 }
 
@@ -478,17 +504,28 @@ async function loadTransactions() {
         allTxs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         const list = document.getElementById('transactionsList');
-        list.innerHTML = allTxs.slice(0, 10).map(tx => `
-            <div class="list-item">
-                <div class="item-info">
-                    <strong>${tx.description || tx.transaction_type}</strong>
-                    <span class="sub-text">${new Date(tx.created_at).toLocaleDateString()}</span>
+        if (!allTxs || allTxs.length === 0) {
+            list.innerHTML = '<div class="empty-state"><i data-lucide="receipt" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucune transaction pour le moment.</p></div>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            return;
+        }
+        list.innerHTML = allTxs.slice(0, 10).map(tx => {
+            const isPositive = tx.amount > 0;
+            return `
+            <div class="admin-tx">
+                <div class="tx-icon ${isPositive ? 'income' : 'expense'}">
+                    <i data-lucide="${isPositive ? 'arrow-down-left' : 'arrow-up-right'}" class="w-4 h-4"></i>
                 </div>
-                <div class="item-amount ${tx.amount > 0 ? 'pos' : 'neg'}">
-                    ${tx.amount > 0 ? '+' : ''}${parseFloat(tx.amount).toFixed(2)} ${tx.currency}
+                <div class="tx-info">
+                    <div class="tx-desc">${tx.description || tx.transaction_type}</div>
+                    <div class="tx-date">${new Date(tx.created_at).toLocaleDateString('fr-FR', {day:'numeric',month:'short',year:'numeric'})}</div>
                 </div>
-            </div>
-        `).join('');
+                <div class="tx-amount ${isPositive ? 'pos' : 'neg'}">
+                    ${isPositive ? '+' : ''}${parseFloat(tx.amount).toFixed(2)} ${tx.currency}
+                </div>
+            </div>`;
+        }).join('');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
 
     } catch (e) { console.error(e); }
 }
