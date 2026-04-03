@@ -744,6 +744,18 @@ async function init() {
             `;
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
+
+        // 3. Override Top Nav links for admin (desktop)
+        const topNavLinks = document.querySelector('.top-nav .nav-links');
+        if (topNavLinks) {
+            topNavLinks.innerHTML = `
+                <a href="/admin.html" class="${path.includes('admin.html') && !path.includes('admin-') ? 'active' : ''}">Dashboard</a>
+                <a href="/admin-students.html" class="${path.includes('admin-students.html') ? 'active' : ''}">Étudiants</a>
+                <a href="/admin-events.html" class="${path.includes('admin-events.html') ? 'active' : ''}">Events</a>
+                <a href="/admin-finances.html" class="${path.includes('admin-finances.html') ? 'active' : ''}">Finances</a>
+                <a href="/profile.html" class="${path.includes('profile.html') ? 'active' : ''}">Profil</a>
+            `;
+        }
     }
 
     if (path === '/' || path === '/index.html') {
