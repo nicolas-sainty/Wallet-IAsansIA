@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const Event = require('../../../../core/domain/entities/Event');
 
 /**
@@ -144,12 +145,14 @@ class SupabaseEventRepository {
         });
     }
 
-    async addParticipant(eventId, walletId) {
+    async addParticipant(eventId, walletId, pointsEarned = 0) {
         const { data, error } = await this.supabase
             .from('event_participants')
             .insert({
+                participant_id: uuidv4(),
                 event_id: eventId,
                 wallet_id: walletId,
+                points_earned: pointsEarned,
                 status: 'PENDING'
             })
             .select()
@@ -237,14 +240,27 @@ class SupabaseEventRepository {
         });
     }
 
-    async updateParticipationStatus(participantId, status) {
-        const { error } = await this.supabase
+    async findParticipationById(participantId) {
+        const { data, error } = await this.supabase
             .from('event_participants')
-            .update({ status, updated_at: new Date().toISOString() })
-            .eq('participant_id', participantId);
+            .select('*')
+            .eq('participant_id', participantId)
+            .maybeSingle();
         
         if (error) throw error;
-        return true;
+        return data;
+    }
+
+    async updateParticipationStatus(participantId, status) {
+        const { data, error } = await this.supabase
+            .from('event_participants')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('participant_id', participantId)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        return data;
     }
 }
 

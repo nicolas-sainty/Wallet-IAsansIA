@@ -25,7 +25,7 @@ class ParticipateInEvent {
         const isAlreadyParticipating = await this.eventRepository.isParticipating(userId, eventId);
         if (isAlreadyParticipating) throw new Error('Déjà inscrit à cet événement');
 
-        const participation = await this.eventRepository.addParticipant(eventId, creditWallet.walletId);
+        const participation = await this.eventRepository.addParticipant(eventId, creditWallet.walletId, event.rewardPoints);
         this.logger.info('Participation enregistrée (Architecture Hexagonale)', { eventId, userId });
 
         return participation;
