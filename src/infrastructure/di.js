@@ -108,7 +108,7 @@ function bootstrap() {
     const participateInEventUC = new ParticipateInEvent(eventRepo, walletRepo, logger);
     const getParticipantsUC = new GetParticipants(eventRepo);
     const getPendingParticipationsUC = new GetPendingParticipations(eventRepo);
-    const validateParticipationUC = new ValidateParticipation(eventRepo, walletRepo, logger);
+    const validateParticipationUC = new ValidateParticipation(eventRepo, walletRepo, transactionRepo, logger);
     const createEventUC = new CreateEvent(eventRepo, logger);
 
     const createCheckoutSessionUC = new CreateCheckoutSession(paymentProcessor, logger);

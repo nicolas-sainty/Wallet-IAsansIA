@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Enums
 CREATE TYPE wallet_status AS ENUM ('active', 'suspended', 'closed');
-CREATE TYPE transaction_type AS ENUM ('P2P', 'MERCHANT', 'CASHIN', 'CASHOUT');
+CREATE TYPE transaction_type AS ENUM ('P2P', 'MERCHANT', 'CASHIN', 'CASHOUT', 'REWARD');
 CREATE TYPE transaction_direction AS ENUM ('outgoing', 'incoming');
 CREATE TYPE transaction_status AS ENUM ('PENDING', 'SUCCESS', 'FAILED', 'CANCELED');
 CREATE TYPE group_status AS ENUM ('active', 'suspended');
