@@ -1,0 +1,53 @@
+[33mwarn[39m: JWT_REFRESH_SECRET manquant, dérivé de JWT_SECRET. Configurez une clé dédiée en prod. {"service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+[33mwarn[39m: JWT_REFRESH_SECRET manquant, dérivé de JWT_SECRET. Configurez une clé dédiée en prod. {"service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+--- Starting E2E Flow ---
+1. Registering BDE...
+[32minfo[39m: 🚀 Epicoin API server running on port 3003 {"service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+[32minfo[39m: 📊 Environment: development {"service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+[32minfo[39m: 🔗 API Documentation: http://localhost:3003/api {"service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+
+✓ Server ready at http://localhost:3003
+✓ API Documentation: http://localhost:3003/api
+✓ Health Check: http://localhost:3003/health
+
+[32minfo[39m: Incoming request {"ip_hash":"3e48ef9d22e096da6838540fb846999890462c8a32730a4f7a5eaee6945315f7","method":"POST","path":"/api/v2/auth/bde/register","service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+✓ Connected to Supabase
+[32minfo[39m: 📧 Email Service initialized with Ethereal (Dev Mode) {"service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+[32minfo[39m: 📧 Preview URL base: https://ethereal.email/message/ {"service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+[32minfo[39m: BDE Registered successfully {"groupId":"5605bbf8-e4ed-40fd-852a-c7f91535e308","service":"epicoin-api","timestamp":"2026-04-03 14:44:21","userId":"c9704610-538a-4c23-b2b6-23ed32edfbc3"}
+Result 1: 201 {
+  success: true,
+  bdeId: '5605bbf8-e4ed-40fd-852a-c7f91535e308',
+  userId: 'c9704610-538a-4c23-b2b6-23ed32edfbc3',
+  email: 'bde_1775220261084@test.com',
+  message: 'Inscription du BDE réussie !'
+}
+2. Login BDE...
+[32minfo[39m: Incoming request {"ip_hash":"3e48ef9d22e096da6838540fb846999890462c8a32730a4f7a5eaee6945315f7","method":"POST","path":"/api/v2/auth/login","service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+Result 2: 200 true {
+  user_id: 'c9704610-538a-4c23-b2b6-23ed32edfbc3',
+  email: 'bde_1775220261084@test.com',
+  full_name: 'Admin BDE E2E',
+  role: 'bde_admin',
+  bde_id: '5605bbf8-e4ed-40fd-852a-c7f91535e308'
+}
+3. Registering Member...
+[32minfo[39m: Incoming request {"ip_hash":"3e48ef9d22e096da6838540fb846999890462c8a32730a4f7a5eaee6945315f7","method":"POST","path":"/api/v2/auth/bde/members","service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+[32minfo[39m: Accès étudiant créé par BDE {"bdeId":"5605bbf8-e4ed-40fd-852a-c7f91535e308","service":"epicoin-api","studentId":"7f152aea-3f0a-4530-a6e9-78604dbcaab8","timestamp":"2026-04-03 14:44:21"}
+Result 3: 201 {
+  success: true,
+  userId: '7f152aea-3f0a-4530-a6e9-78604dbcaab8',
+  email: 'student_1775220261084@test.com',
+  bdeId: '5605bbf8-e4ed-40fd-852a-c7f91535e308',
+  message: 'Accès étudiant créé avec succès.'
+}
+4. Login Member...
+[32minfo[39m: Incoming request {"ip_hash":"3e48ef9d22e096da6838540fb846999890462c8a32730a4f7a5eaee6945315f7","method":"POST","path":"/api/v2/auth/login","service":"epicoin-api","timestamp":"2026-04-03 14:44:21"}
+Result 4: 200 true {
+  user_id: '7f152aea-3f0a-4530-a6e9-78604dbcaab8',
+  email: 'student_1775220261084@test.com',
+  full_name: 'Test Student',
+  role: 'student',
+  bde_id: '5605bbf8-e4ed-40fd-852a-c7f91535e308'
+}
+All PASSED! Exiting...

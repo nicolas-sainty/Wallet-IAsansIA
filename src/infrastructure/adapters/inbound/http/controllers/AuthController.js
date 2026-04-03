@@ -2,11 +2,13 @@
  * Contrôleur Express pour l'authentification (Architecture Hexagonale)
  */
 class AuthController {
-    constructor(registerUserUseCase, loginUserUseCase, verifyEmailUseCase, refreshTokenUseCase) {
+    constructor(registerUserUseCase, loginUserUseCase, verifyEmailUseCase, refreshTokenUseCase, registerBDEUseCase, createMemberAccessUseCase) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUserUseCase = loginUserUseCase;
         this.verifyEmailUseCase = verifyEmailUseCase;
         this.refreshTokenUseCase = refreshTokenUseCase;
+        this.registerBDEUseCase = registerBDEUseCase;
+        this.createMemberAccessUseCase = createMemberAccessUseCase;
     }
 
     async register(req, res) {
@@ -71,6 +73,32 @@ class AuthController {
             return res.json({ success: true, token: result.token });
         } catch (error) {
             return res.status(401).json({ success: false, error: error.message });
+        }
+    }
+    async registerBDE(req, res) {
+        try {
+            const { bdeName, email, password, fullName } = req.body;
+            const result = await this.registerBDEUseCase.execute({ bdeName, email, password, fullName });
+            return res.status(201).json({ success: true, ...result });
+        } catch (error) {
+            return res.status(400).json({ success: false, error: error.message });
+        }
+    }
+
+    async createMember(req, res) {
+        try {
+            const { email, fullName, password } = req.body;
+            const bdeId = req.user.bde_id || req.user.bdeId; // Injecté par le middleware d'auth
+            const adminUserId = req.user.userId;
+
+            if (req.user.role !== 'bde_admin') {
+                return res.status(403).json({ success: false, error: 'Seul un BDE peut créer des accès membres' });
+            }
+
+            const result = await this.createMemberAccessUseCase.execute({ email, fullName, password, bdeId, adminUserId });
+            return res.status(201).json({ success: true, ...result });
+        } catch (error) {
+            return res.status(400).json({ success: false, error: error.message });
         }
     }
 }

@@ -27,6 +27,8 @@ const TransferCredits = require('../core/application/use-cases/TransferCredits')
 const GetWalletBalance = require('../core/application/use-cases/GetWalletBalance');
 const GetWallets = require('../core/application/use-cases/GetWallets');
 const GetWalletTransactions = require('../core/application/use-cases/GetWalletTransactions');
+const RegisterBDE = require('../core/application/use-cases/RegisterBDE');
+const CreateMemberAccess = require('../core/application/use-cases/CreateMemberAccess');
 const RegisterUser = require('../core/application/use-cases/RegisterUser');
 const LoginUser = require('../core/application/use-cases/LoginUser');
 const VerifyEmail = require('../core/application/use-cases/VerifyEmail');
@@ -84,6 +86,8 @@ function bootstrap() {
     const getWalletsUC = new GetWallets(walletRepo);
     const getWalletTransactionsUC = new GetWalletTransactions(transactionRepo);
 
+    const registerBDEUC = new RegisterBDE(userRepo, groupRepo, walletRepo, hashProvider, logger);
+    const createMemberAccessUC = new CreateMemberAccess(userRepo, walletRepo, hashProvider, logger);
     const registerUserUC = new RegisterUser(userRepo, walletRepo, emailProvider, hashProvider, logger);
     const loginUserUC = new LoginUser(userRepo, hashProvider, logger, {
         secret: getJwtSecret(),
@@ -118,7 +122,7 @@ function bootstrap() {
     // 4. Instancier les contrôleurs (Adapteurs d'entrée)
     const transactionController = new TransactionController(initiateTransactionUC, processTransactionUC, transferCreditsUC);
     const walletController = new WalletController(getWalletBalanceUC, getWalletsUC, getWalletTransactionsUC);
-    const authController = new AuthController(registerUserUC, loginUserUC, verifyEmailUC, refreshTokenUC);
+    const authController = new AuthController(registerUserUC, loginUserUC, verifyEmailUC, refreshTokenUC, registerBDEUC, createMemberAccessUC);
     const groupController = new GroupController(createGroupUC, getGroupsUC, getGroupUC);
     const eventController = new EventController(getEventsUC, participateInEventUC, getParticipantsUC, getPendingParticipationsUC, validateParticipationUC, createEventUC);
     const paymentController = new PaymentController(createCheckoutSessionUC, getPaymentRequestsUC, respondToPaymentRequestUC);
