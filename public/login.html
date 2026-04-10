@@ -29,12 +29,6 @@
             <h1 class="text-2xl font-bold mb-1 text-center">Portail Epicoin</h1>
             <p class="text-sm opacity-50 mb-6 text-center">Gère tes points et tes événements</p>
 
-            <!-- Tabs -->
-            <div role="tablist" class="tabs tabs-bordered mb-6">
-                <button role="tab" class="tab tab-active" data-target="loginLink">Connexion</button>
-                <button role="tab" class="tab" data-target="registerLink">Enregistrer un BDE</button>
-            </div>
-
             <!-- Login -->
             <form id="loginForm">
                 <div class="form-control mb-3">
@@ -53,6 +47,7 @@
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary w-full">Se Connecter</button>
+                <button type="button" id="showRegisterBtn" class="btn btn-outline w-full mt-3" style="border-color: var(--accent); color: var(--accent);">Enregistrer un BDE</button>
             </form>
 
             <!-- Register BDE -->
@@ -94,22 +89,20 @@
     <script>
         lucide.createIcons();
 
-        const tabs = document.querySelectorAll('.tab');
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
+        const showRegisterBtn = document.getElementById('showRegisterBtn');
 
-        function switchTab(target) {
-            tabs.forEach(tab => {
-                tab.classList.toggle('tab-active', tab.dataset.target === target);
-            });
-            loginForm.style.display = target === 'loginLink' ? 'block' : 'none';
-            registerForm.style.display = target === 'registerLink' ? 'block' : 'none';
-        }
-
-        tabs.forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.target)));
+        showRegisterBtn.addEventListener('click', () => {
+            loginForm.style.display = 'none';
+            registerForm.style.display = 'block';
+        });
 
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('tab') === 'register') switchTab('registerLink');
+        if (urlParams.get('tab') === 'register') {
+            loginForm.style.display = 'none';
+            registerForm.style.display = 'block';
+        }
 
         // Password toggle
         document.querySelectorAll('.toggle-password').forEach(btn => {

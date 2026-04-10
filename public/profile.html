@@ -127,25 +127,15 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", async () => {
+            // Backward compatibility: if an older tab stored auth only in sessionStorage,
+            // mirror it to localStorage so all pages read the same source.
             try {
-                const keys = new Set(['token', 'user']);
-                const ls = window.localStorage;
-                const originalGetItem = ls.getItem.bind(ls);
-                const originalSetItem = ls.setItem.bind(ls);
-                const originalRemoveItem = ls.removeItem.bind(ls);
-
-                ls.getItem = function (key) {
-                    if (keys.has(key)) return sessionStorage.getItem(key);
-                    return originalGetItem(key);
-                };
-                ls.setItem = function (key, value) {
-                    if (keys.has(key)) return sessionStorage.setItem(key, value);
-                    return originalSetItem(key, value);
-                };
-                ls.removeItem = function (key) {
-                    if (keys.has(key)) return sessionStorage.removeItem(key);
-                    return originalRemoveItem(key);
-                };
+                if (!localStorage.getItem('token') && sessionStorage.getItem('token')) {
+                    localStorage.setItem('token', sessionStorage.getItem('token'));
+                }
+                if (!localStorage.getItem('user') && sessionStorage.getItem('user')) {
+                    localStorage.setItem('user', sessionStorage.getItem('user'));
+                }
             } catch (e) { }
 
             let user = JSON.parse(localStorage.getItem('user'));

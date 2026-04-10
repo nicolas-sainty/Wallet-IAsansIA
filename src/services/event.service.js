@@ -10,8 +10,23 @@ class EventService {
     /**
      * Create a new event
      */
-    async createEvent(userId, groupId, title, description, eventDate, rewardPoints, maxParticipants = null, status = 'DRAFT') {
+    async createEvent(
+        userId,
+        groupId,
+        title,
+        description,
+        eventDate,
+        rewardPoints = 0,
+        maxParticipants = null,
+        status = 'DRAFT'
+    ) {
         const eventId = uuidv4();
+        const validStatuses = ['DRAFT', 'OPEN', 'FULL', 'CLOSED', 'CANCELLED'];
+        const normalizedStatus = String(status || 'DRAFT').toUpperCase();
+
+        if (!validStatuses.includes(normalizedStatus)) {
+            throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+        }
 
         try {
             const { error } = await supabase
@@ -24,17 +39,53 @@ class EventService {
                     event_date: eventDate,
                     reward_points: rewardPoints,
                     max_participants: maxParticipants,
-                    status,
+                    status: normalizedStatus,
                     created_by_user_id: userId,
                     current_participants: 0
                 });
 
             if (error) throw error;
 
-            logger.info(`Event created: ${title} (${eventId}) by user ${userId}`);
+            logger.info(`Event created: ${title} (${eventId})`);
             return this.getEvent(eventId);
         } catch (error) {
             logger.error('Error creating event:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get events with optional filters
+     */
+    async getEvents(filters = {}) {
+        try {
+            let query = supabase
+                .from('events')
+                .select(`
+                    *,
+                    groups:group_id (group_name),
+                    users:created_by_user_id (full_name)
+                `);
+
+            if (filters.groupId) {
+                query = query.eq('group_id', filters.groupId);
+            }
+
+            if (filters.status) {
+                query = query.eq('status', String(filters.status).toUpperCase());
+            }
+
+            const { data, error } = await query.order('event_date', { ascending: true });
+
+            if (error) throw error;
+
+            return (data || []).map(event => ({
+                ...event,
+                group_name: event.groups?.group_name || null,
+                creator_name: event.users?.full_name || null
+            }));
+        } catch (error) {
+            logger.error('Error fetching filtered events:', error);
             throw error;
         }
     }
@@ -100,14 +151,6 @@ class EventService {
     async participate(eventId, walletId) {
         const event = await this.getEvent(eventId);
         if (!event) throw new Error('Event not found');
-
-        // Check event status
-        if (event.status === 'FULL') {
-            throw new Error('Event is full');
-        }
-        if (event.status !== 'OPEN') {
-            throw new Error('Event is not open for registration');
-        }
 
         // Check if already participated
         const { data: existing } = await supabase

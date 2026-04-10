@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
+const groupService = require('./group.service');
 const { supabase } = require('../config/database');
 const {
     getJwtSecret,
@@ -13,6 +14,30 @@ const {
 const SALT_ROUNDS = 10;
 
 class AuthService {
+    issueTokens(user) {
+        const jwtSecret = getJwtSecret();
+        const accessToken = jwt.sign(
+            {
+                userId: user.user_id,
+                email: user.email,
+                role: user.role
+            },
+            jwtSecret,
+            { expiresIn: getAccessTtl() }
+        );
+
+        const refreshToken = jwt.sign(
+            {
+                userId: user.user_id,
+                type: 'refresh',
+            },
+            getJwtRefreshSecret(),
+            { expiresIn: getRefreshTtl() }
+        );
+
+        return { accessToken, refreshToken };
+    }
+
     async register(email, password, fullName, role = 'student') {
         // Security: only allow public registration with safe roles.
         const ALLOWED_PUBLIC_ROLES = ['student'];
@@ -128,26 +153,7 @@ class AuthService {
             throw new Error('Email non vérifié. Veuillez vérifier votre email.');
         }
 
-        const jwtSecret = getJwtSecret();
-
-        const accessToken = jwt.sign(
-            {
-                userId: user.user_id,
-                email: user.email,
-                role: user.role
-            },
-            jwtSecret,
-            { expiresIn: getAccessTtl() }
-        );
-
-        const refreshToken = jwt.sign(
-            {
-                userId: user.user_id,
-                type: 'refresh',
-            },
-            getJwtRefreshSecret(),
-            { expiresIn: getRefreshTtl() }
-        );
+        const { accessToken, refreshToken } = this.issueTokens(user);
 
         return {
             token: accessToken,
@@ -159,6 +165,158 @@ class AuthService {
                 role: user.role,
                 bde_id: user.bde_id
             }
+        };
+    }
+
+    async registerBDE(bdeName, email, password, fullName) {
+        if (!bdeName || !email || !password || !fullName) {
+            throw new Error('Champs requis manquants');
+        }
+
+        const { data: existingUsers, error: checkError } = await supabase
+            .from('users')
+            .select('user_id')
+            .eq('email', email);
+
+        if (checkError) {
+            logger.error('Error checking existing user for BDE registration', checkError);
+            throw new Error('Erreur lors de la vérification de l\'email');
+        }
+        if (existingUsers && existingUsers.length > 0) {
+            throw new Error('Cet email est déjà utilisé.');
+        }
+
+        const userId = uuidv4();
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+        // 1) Create admin user
+        const { error: insertUserError } = await supabase
+            .from('users')
+            .insert({
+                user_id: userId,
+                email,
+                password_hash: hashedPassword,
+                full_name: fullName,
+                role: 'bde_admin',
+                is_verified: true,
+                verification_token: null
+            });
+
+        if (insertUserError) {
+            logger.error('Error inserting BDE admin user', insertUserError);
+            throw new Error('Erreur lors de la création du compte administrateur');
+        }
+
+        try {
+            // 2) Create BDE group and group EUR wallet
+            const group = await groupService.createGroup(bdeName, userId, {});
+            const bdeId = group.group_id;
+
+            // 3) Link admin to the created group
+            const { error: updateUserError } = await supabase
+                .from('users')
+                .update({ bde_id: bdeId })
+                .eq('user_id', userId);
+            if (updateUserError) throw updateUserError;
+
+            // 4) Create a CREDITS wallet for admin account (optional but useful in UI)
+            await supabase
+                .from('wallets')
+                .insert({
+                    wallet_id: uuidv4(),
+                    user_id: userId,
+                    group_id: bdeId,
+                    balance: 0,
+                    currency: 'CREDITS',
+                    status: 'active'
+                });
+
+            const user = {
+                user_id: userId,
+                email,
+                full_name: fullName,
+                role: 'bde_admin',
+                bde_id: bdeId
+            };
+            const { accessToken, refreshToken } = this.issueTokens(user);
+
+            return {
+                token: accessToken,
+                refreshToken,
+                user: {
+                    userId,
+                    email,
+                    fullName,
+                    role: 'bde_admin',
+                    bde_id: bdeId,
+                },
+            };
+        } catch (error) {
+            logger.error('BDE registration error', error);
+            throw new Error('Erreur lors de la création du BDE');
+        }
+    }
+
+    async createMemberAccess(email, password, fullName, bdeId) {
+        if (!bdeId) throw new Error('BDE non associé à cet administrateur');
+        if (!email || !password || !fullName) throw new Error('Champs requis manquants');
+
+        const { data: existingUsers, error: checkError } = await supabase
+            .from('users')
+            .select('user_id')
+            .eq('email', email);
+        if (checkError) {
+            logger.error('Error checking existing user for member creation', checkError);
+            throw new Error('Erreur lors de la vérification de l\'email');
+        }
+        if (existingUsers && existingUsers.length > 0) {
+            throw new Error('Cet email est déjà utilisé.');
+        }
+
+        const userId = uuidv4();
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+        const { error: insertUserError } = await supabase
+            .from('users')
+            .insert({
+                user_id: userId,
+                email,
+                password_hash: hashedPassword,
+                full_name: fullName,
+                role: 'student',
+                bde_id: bdeId,
+                is_verified: true,
+                verification_token: null
+            });
+        if (insertUserError) {
+            logger.error('Error inserting member user', insertUserError);
+            throw new Error('Erreur lors de la création du compte étudiant');
+        }
+
+        const { error: walletError } = await supabase
+            .from('wallets')
+            .insert({
+                wallet_id: uuidv4(),
+                user_id: userId,
+                group_id: bdeId,
+                balance: 0,
+                currency: 'CREDITS',
+                status: 'active'
+            });
+        if (walletError) {
+            logger.error('Error creating wallet for member', walletError);
+            throw new Error('Compte créé, mais impossible de créer le wallet étudiant');
+        }
+
+        return {
+            user: {
+                userId,
+                email,
+                fullName,
+                role: 'student',
+                bde_id: bdeId,
+            },
+            message: 'Accès étudiant créé avec succès',
         };
     }
 
