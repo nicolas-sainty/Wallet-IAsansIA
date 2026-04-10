@@ -23,7 +23,7 @@ const state = {
 
 const api = {
     async get(endpoint) {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = {};
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
@@ -35,7 +35,7 @@ const api = {
     },
 
     async post(endpoint, data) {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Content-Type': 'application/json' };
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
@@ -305,7 +305,7 @@ async function loadWallets() {
     if (!checkAuth()) return;
 
     try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const payload = JSON.parse(atob(token.split('.')[1]));
         const userId = payload.userId;
 
@@ -518,7 +518,7 @@ function renderTransactions() {
 // ========================================
 
 function checkAuth() {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     return !!token;
 }
 
@@ -546,7 +546,7 @@ function updateNavAuth() {
 
 async function loadCardData() {
     try {
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         const nameEl = document.getElementById('userName');
         const roleEl = document.getElementById('userRoleBadge');
         if (nameEl) nameEl.textContent = user.email;
@@ -605,7 +605,7 @@ async function loadCardData() {
 
 async function loadGroupsForPay() {
     try {
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         const select = document.getElementById('payRecipientGroup');
         if (!select) return;
 
@@ -681,7 +681,7 @@ function closePayModal() {
 async function processPayment() {
     const amountEl = document.getElementById('payAmount');
     const groupEl = document.getElementById('payRecipientGroup');
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
     if (!amountEl || !groupEl) return;
 
@@ -740,7 +740,7 @@ function renderEvents() {
     }
 
     // Check user role
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     const isAdmin = user && (user.role === 'bde_admin' || user.role === 'admin');
 
     // Show create button for admins
@@ -832,7 +832,7 @@ function renderEvents() {
 
 // Helper function to check user's registration status for an event
 async function checkUserRegistrationStatus(eventId) {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user) return null;
 
     try {
@@ -847,7 +847,7 @@ async function checkUserRegistrationStatus(eventId) {
 }
 
 async function participateInEvent(eventId) {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user) {
         showToast('Connectez-vous d\'abord', 'error');
         return;
@@ -930,7 +930,7 @@ async function validateParticipation(participantId, status) {
 }
 
 async function buyProduct(productId) {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || user.role !== 'student') {
         showToast('Erreur: Seuls les étudiants peuvent acheter des crédits.', 'error');
         return;
@@ -1020,7 +1020,7 @@ async function init() {
 
     const path = window.location.pathname;
 
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
     // BDE Admin Layout Override
     if (checkAuth() && user && (user.role === 'bde_admin' || user.role === 'admin')) {
