@@ -38,6 +38,55 @@ router.post(
 );
 
 router.post(
+    '/bde/register',
+    [
+        body('bdeName').notEmpty().isLength({ min: 2, max: 255 }),
+        body('email').isEmail(),
+        body('password').isLength({ min: 6 }),
+        body('fullName').notEmpty(),
+    ],
+    async (req, res) => {
+        try {
+            const { bdeName, email, password, fullName } = req.body;
+            const result = await authService.registerBDE(bdeName, email, password, fullName);
+
+            res.cookie('refresh_token', result.refreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+            });
+
+            return res.status(201).json({ token: result.token, user: result.user });
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
+    }
+);
+
+router.post(
+    '/bde/members',
+    requireAuth,
+    [
+        body('email').isEmail(),
+        body('password').isLength({ min: 6 }),
+        body('fullName').notEmpty(),
+    ],
+    async (req, res) => {
+        try {
+            if (req.user.role !== 'bde_admin' && req.user.role !== 'admin') {
+                return res.status(403).json({ error: 'Accès administrateur requis' });
+            }
+            const { email, password, fullName } = req.body;
+            const result = await authService.createMemberAccess(email, password, fullName, req.user.bde_id);
+            return res.status(201).json(result);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
+    }
+);
+
+router.post(
     '/login',
     [
         body('email').isEmail(),

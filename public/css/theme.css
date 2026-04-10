@@ -641,6 +641,14 @@ body {
 .admin-quick-link i { color: var(--accent); }
 
 /* ── Admin form card ─────────────────── */
+/* ── Global input overrides ───────────── */
+.input,
+.select,
+textarea {
+  padding-left: 8px !important;
+  border-radius: var(--radius-md) !important;
+}
+
 .admin-form-group {
   display: flex;
   flex-direction: column;
@@ -657,6 +665,52 @@ body {
 .admin-form-group .input-row {
   display: flex;
   gap: 0.5rem;
+}
+
+/* ── Password toggle wrapper ─────────── */
+.password-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-wrapper .input {
+  padding-right: 44px !important;
+}
+
+.password-wrapper .toggle-password {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-base);
+}
+
+.password-wrapper .toggle-password:hover {
+  color: var(--text-primary);
+}
+
+/* ── Login page centered ─────────────── */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 60px);
+  padding: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.login-container .glass-card {
+  width: 100%;
+  max-width: 420px;
 }
 
 /* ── Admin transaction row ───────────── */

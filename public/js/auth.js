@@ -17,7 +17,7 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     const password = document.getElementById('loginPassword').value;
 
     try {
-        const res = await fetch(`${API_BASE}/api/v2/auth/login`, {
+        const res = await fetch(`${API_BASE}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -26,8 +26,11 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        sessionStorage.setItem('token', data.token);
-        sessionStorage.setItem('user', JSON.stringify(data.user));
+        // Keep both storages aligned: the rest of the app reads localStorage.
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        try { sessionStorage.setItem('token', data.token); } catch (e) { }
+        try { sessionStorage.setItem('user', JSON.stringify(data.user)); } catch (e) { }
 
         showToast('Connexion réussie', 'success');
         setTimeout(() => window.location.href = '/', 1000);
@@ -45,7 +48,7 @@ document.getElementById('registerForm')?.addEventListener('submit', async (e) =>
     const password = document.getElementById('regPassword').value;
 
     try {
-        const res = await fetch(`${API_BASE}/api/v2/auth/bde/register`, {
+        const res = await fetch(`${API_BASE}/api/auth/bde/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bdeName, fullName, email, password })

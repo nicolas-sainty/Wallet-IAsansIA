@@ -39,13 +39,19 @@
     <div class="app-shell">
         <div class="page-content">
             <!-- Profile Header -->
-            <div class="glass-card text-center">
+            <div class="glass-card">
+                <h3 class="font-semibold mb-4 flex items-center gap-2">
+                    <i data-lucide="user" class="w-5 h-5" style="color: var(--accent)"></i>
+                    Mon profil
+                </h3>
+                <div class="text-center">
                 <div class="w-20 h-20 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-2xl font-bold text-white mx-auto mb-3">
                     <span id="profileInitials">?</span>
                 </div>
                 <h2 id="profileName" class="text-xl font-bold">Chargement...</h2>
                 <p id="profileEmail" class="text-sm opacity-50 mt-1">...</p>
-                <div id="profileRole" class="badge badge-ghost mt-2">STUDENT</div>
+                <div id="profileRole" class="badge badge-ghost mt-2" style="padding: 0.35rem 0.85rem;">STUDENT</div>
+                </div>
             </div>
 
             <!-- BDE Information -->
@@ -77,17 +83,17 @@
                     <i data-lucide="settings" class="w-5 h-5"></i>
                     Paramètres
                 </h3>
-                <div class="flex justify-between items-center py-2 border-b border-white/5">
+                <div class="flex justify-between items-center py-3 border-b border-white/5">
                     <span>Notifications</span>
                     <input type="checkbox" class="toggle toggle-sm toggle-primary" checked>
                 </div>
-                <div class="flex justify-between items-center py-2 border-b border-white/5">
+                <div class="flex justify-between items-center py-3 border-b border-white/5">
                     <span>Thème</span>
                     <button id="themeToggle" class="btn btn-ghost btn-sm btn-circle">
                         <i data-lucide="moon" class="w-4 h-4"></i>
                     </button>
                 </div>
-                <div class="mt-4">
+                <div class="mt-5">
                     <button id="logoutBtn" class="btn btn-outline btn-error w-full btn-sm">
                         <i data-lucide="log-out" class="w-4 h-4"></i>
                         Se Déconnecter
@@ -121,25 +127,15 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", async () => {
+            // Backward compatibility: if an older tab stored auth only in sessionStorage,
+            // mirror it to localStorage so all pages read the same source.
             try {
-                const keys = new Set(['token', 'user']);
-                const ls = window.localStorage;
-                const originalGetItem = ls.getItem.bind(ls);
-                const originalSetItem = ls.setItem.bind(ls);
-                const originalRemoveItem = ls.removeItem.bind(ls);
-
-                ls.getItem = function (key) {
-                    if (keys.has(key)) return sessionStorage.getItem(key);
-                    return originalGetItem(key);
-                };
-                ls.setItem = function (key, value) {
-                    if (keys.has(key)) return sessionStorage.setItem(key, value);
-                    return originalSetItem(key, value);
-                };
-                ls.removeItem = function (key) {
-                    if (keys.has(key)) return sessionStorage.removeItem(key);
-                    return originalRemoveItem(key);
-                };
+                if (!localStorage.getItem('token') && sessionStorage.getItem('token')) {
+                    localStorage.setItem('token', sessionStorage.getItem('token'));
+                }
+                if (!localStorage.getItem('user') && sessionStorage.getItem('user')) {
+                    localStorage.setItem('user', sessionStorage.getItem('user'));
+                }
             } catch (e) { }
 
             let user = JSON.parse(localStorage.getItem('user'));
