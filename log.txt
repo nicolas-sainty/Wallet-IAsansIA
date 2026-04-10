@@ -1,0 +1,15 @@
+﻿1b938d4 Revert UI changes but retain functional logic
+03d6c62 app.js plsss?
+7d4d469 Merge conflicts resolved
+81fd029 Apply Security fixes and JWT refactoring
+9ceea3e fix(rate-limit): enforce safer minimum threshold behind proxy
+8a84b40 fix: stabilize payment verification, event visibility, and API rate-limit behavior
+44022be Merge remote fix-detached-head
+2bd290c fix: restore shop actions and admin panel API flows
+d60b4b9 Refacto UI Admin/Supression du role check
+2e033c4 chore: webhook auto-deploy connectivity test
+49af4bd fix(auth): use /api/auth/login and persist session in localStorage
+07650cd fix: resolve merge conflicts and harden server startup for deployment
+62e450a Refacto UI Admin/Supression du role check
+b144aa0 Ajout responsive
+c9c0f5b Rework login

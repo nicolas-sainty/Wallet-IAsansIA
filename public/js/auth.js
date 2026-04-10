@@ -26,11 +26,8 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        // Keep both storages aligned: the rest of the app reads localStorage.
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        try { sessionStorage.setItem('token', data.token); } catch (e) { }
-        try { sessionStorage.setItem('user', JSON.stringify(data.user)); } catch (e) { }
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('user', JSON.stringify(data.user));
 
         showToast('Connexion réussie', 'success');
         setTimeout(() => window.location.href = '/', 1000);

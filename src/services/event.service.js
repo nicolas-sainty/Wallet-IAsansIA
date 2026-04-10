@@ -93,9 +93,9 @@ class EventService {
     /**
      * Get all upcoming events
      */
-    async getUpcomingEvents() {
+    async getUpcomingEvents(groupId = null) {
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('events')
                 .select(`
                     *,
@@ -104,6 +104,12 @@ class EventService {
                 `)
                 .in('status', ['OPEN', 'FULL'])
                 .order('event_date', { ascending: true });
+
+            if (groupId) {
+                query = query.eq('group_id', groupId);
+            }
+
+            const { data, error } = await query;
 
             if (error) throw error;
 

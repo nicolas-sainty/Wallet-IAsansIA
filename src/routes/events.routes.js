@@ -6,25 +6,31 @@
 const express = require('express');
 const router = express.Router();
 const eventService = require('../services/event.service');
-const { requireAuth, requireAdmin } = require('../middleware/auth.middleware');
+const { requireAuth, requireAdmin, optionalAuth } = require('../middleware/auth.middleware');
 const logger = require('../config/logger');
 
 /**
  * GET /api/events
  * Get all events (public or filtered)
  */
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
         const { groupId, status } = req.query;
         const filters = {};
 
-        if (groupId) filters.groupId = groupId;
+        let targetGroup = groupId;
+        // User isolation
+        if (req.user && req.user.bde_id) {
+            targetGroup = req.user.bde_id;
+        }
+
+        if (targetGroup) filters.groupId = targetGroup;
         if (status) filters.status = status;
 
         // Use getUpcomingEvents for default list (OPEN/FULL events)
-        const events = Object.keys(filters).length > 0
-            ? await eventService.getEvents(filters)
-            : await eventService.getUpcomingEvents();
+        const events = !status
+            ? await eventService.getUpcomingEvents(targetGroup)
+            : await eventService.getEvents(filters);
 
         res.json({ success: true, data: events });
     } catch (error) {

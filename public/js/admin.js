@@ -6,18 +6,18 @@
 const ADMIN_API_BASE = window.location.origin;
 window.currentBdeId = null;
 
+// Auth storage hardening: admin page script historically reads/writes localStorage.
+// Redirect auth keys to sessionStorage to avoid persistence and reduce token exposure.
+
 // ========================================
 // Initialization
 // ========================================
 
 document.addEventListener("DOMContentLoaded", async () => {
     // Check Auth
+    // Check Auth
     const userStored = JSON.parse(sessionStorage.getItem('user'));
-    if (!userStored) {
-        window.location.href = '/login.html';
-        return;
-    }
-    if (userStored.role !== 'bde_admin' && userStored.role !== 'admin') {
+    if (!userStored || userStored.role !== 'bde_admin') {
         alert("Accès refusé. Réservé aux administrateurs BDE.");
         window.location.href = '/';
         return;
@@ -50,9 +50,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             const res = await fetch(`${ADMIN_API_BASE}/api/groups`, {
                 headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
             });
-            const groups = (await res.json()).data || [];
-            const currentUserId = userStored.user_id || userStored.userId;
-            const myGroup = groups.find(g => g.admin_user_id === currentUserId);
+            const groups = (await res.json()).data;
+            const myGroup = groups.find(g => g.admin_user_id === userStored.user_id);
             if (myGroup) {
                 window.currentBdeId = myGroup.group_id;
                 // Save it for next time
@@ -186,15 +185,15 @@ async function loadStudents() {
         const members = (await res.json()).data;
 
         if (!members || members.length === 0) {
-            if (list) list.innerHTML = '<div class="empty-state"><i data-lucide="users" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucun étudiant membre pour le moment.</p></div>';
-            if (typeof lucide !== 'undefined') lucide.createIcons();
+            if (list) list.innerHTML = '<p class="text-muted">Aucun étudiant membre pour le moment.</p>';
+            // Don't return, allow select population (might be empty but that's fine)
         } else {
             if (list) {
                 list.innerHTML = members.map(m => `
                     <div class="list-item">
                         <div class="item-info">
-                            <strong>${m.full_name || m.email}</strong> <small class="text-muted">(${truncateId(m.user_id)})</small>
-                            <span class="sub-text">Balance: ${parseFloat(m.balance).toFixed(2)} ${m.currency}</span>
+                        <strong>${m.full_name || m.email}</strong> <small class="text-muted">(${truncateId(m.user_id)})</small>
+                        <span class="sub-text">Balance: ${parseFloat(m.balance).toFixed(2)} ${m.currency}</span>
                         </div>
                     </div>
                 `).join('');
@@ -268,23 +267,16 @@ async function addStudent() {
 // ========================================
 
 async function loadAdminEvents() {
+    // Re-use existing GET /api/events logic but filtered? 
+    // Currently fetches all OPEN. We might need filtered list for admin to see DRAFT/CLOSED too.
+    const res = await fetch(`${ADMIN_API_BASE}/api/events`, {
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
+    });
+    const events = (await res.json()).data;
+    const myEvents = events.filter(e => e.group_id === currentBdeId);
+
     const list = document.getElementById('adminEventsList');
-    if (!list) return;
-
-    try {
-        const res = await fetch(`${ADMIN_API_BASE}/api/events?groupId=${encodeURIComponent(window.currentBdeId)}`, {
-            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
-        });
-        const payload = await res.json();
-        const myEvents = payload.data || [];
-
-        if (myEvents.length === 0) {
-            list.innerHTML = '<div class="empty-state"><i data-lucide="calendar-off" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucun événement pour le moment.</p></div>';
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-            return;
-        }
-
-        list.innerHTML = myEvents.map(e => `
+    list.innerHTML = myEvents.map(e => `
         <div class="list-item">
             <div class="item-info">
                 <strong>${e.title}</strong>
@@ -295,11 +287,6 @@ async function loadAdminEvents() {
             </div>
         </div>
     `).join('');
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    } catch (e) {
-        console.error(e);
-        list.innerHTML = '<p class="error">Impossible de charger les événements.</p>';
-    }
 }
 
 async function createAdminEvent() {
@@ -307,10 +294,7 @@ async function createAdminEvent() {
     const date = document.getElementById('evtDate').value;
     const points = document.getElementById('evtPoints').value;
 
-    if (!title || !date || !points) {
-        alert("Veuillez remplir tous les champs de l'événement.");
-        return;
-    }
+    if (!title || !date || !points) return;
 
     try {
         const res = await fetch(`${ADMIN_API_BASE}/api/events`, {
@@ -327,18 +311,10 @@ async function createAdminEvent() {
         });
         if (res.ok) {
             alert("Événement créé");
-            document.getElementById('evtTitle').value = '';
-            document.getElementById('evtDate').value = '';
-            document.getElementById('evtPoints').value = '';
-            await loadAdminEvents();
-        } else {
-            const err = await res.json().catch(() => ({}));
-            alert("Erreur création événement: " + (err.error || err.message || res.statusText));
+            loadAdminEvents();
+            // Clear form
         }
-    } catch (e) {
-        console.error(e);
-        alert("Erreur réseau lors de la création de l'événement.");
-    }
+    } catch (e) { console.error(e); }
 }
 
 async function openParticipantsModal(eventId) {
@@ -417,11 +393,6 @@ async function loadPaymentRequests() {
         const requests = (await res.json()).data;
 
         const list = document.getElementById('paymentRequestsList');
-        if (!requests || requests.length === 0) {
-            list.innerHTML = '<div class="empty-state"><i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucune demande en attente.</p></div>';
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-            return;
-        }
         list.innerHTML = requests.map(r => `
             <div class="list-item">
                 <div class="item-info">
@@ -430,7 +401,6 @@ async function loadPaymentRequests() {
                 </div>
             </div>
         `).join('');
-        if (typeof lucide !== 'undefined') lucide.createIcons();
     } catch (e) { console.error(e); }
 }
 
@@ -466,7 +436,7 @@ async function loadTransactions() {
     // History of BDE wallet transactions (Polar.sh sales etc)
     // First get wallet ID
     try {
-        const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${window.currentBdeId}`, {
+        const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${currentBdeId}`, {
             headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         const wallets = (await wRes.json()).data; // Array of wallets
@@ -484,11 +454,6 @@ async function loadTransactions() {
         allTxs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         const list = document.getElementById('transactionsList');
-        if (!allTxs || allTxs.length === 0) {
-            list.innerHTML = '<div class="empty-state"><i data-lucide="receipt" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucune transaction pour le moment.</p></div>';
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-            return;
-        }
         list.innerHTML = allTxs.slice(0, 10).map(tx => `
             <div class="list-item">
                 <div class="item-info">
@@ -500,7 +465,6 @@ async function loadTransactions() {
                 </div>
             </div>
         `).join('');
-        if (typeof lucide !== 'undefined') lucide.createIcons();
 
     } catch (e) { console.error(e); }
 }

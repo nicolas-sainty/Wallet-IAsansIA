@@ -1,0 +1,10 @@
+﻿1b938d4 Revert UI changes but retain functional logic
+8a84b40 fix: stabilize payment verification, event visibility, and API rate-limit behavior
+2bd290c fix: restore shop actions and admin panel API flows
+62e450a Refacto UI Admin/Supression du role check
+c9c0f5b Rework login
+f952bfb Ajout login
+c578752 security: implement comprehensive security & GDPR remediation plan
+2494e27 feat: Implement shop functionality, admin dashboard for finances and user management, and core payment/wallet services.
+db32e56 feat: Initialize project structure and implement core UI styling for the Wallet-IAsansIA application.
+917d963 feat: Implement core event management, user authentication, group management, and administrative functionalities including payment requests.

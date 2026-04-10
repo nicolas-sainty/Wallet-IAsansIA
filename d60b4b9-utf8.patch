@@ -1,0 +1,261 @@
+﻿commit d60b4b9b240fca9e4ff05527faaf995dca73916e
+Author: Gs <gs.duplaix@gmail.com>
+Date:   Fri Apr 10 10:57:34 2026 +0200
+
+    Refacto UI Admin/Supression du role check
+    
+    Co-authored-by: Florent Canales florent.canales@epitech.digital
+
+diff --git a/public/admin-finances.html b/public/admin-finances.html
+index 9518b0b..42795dd 100644
+--- a/public/admin-finances.html
++++ b/public/admin-finances.html
+@@ -60,15 +60,13 @@
+                     <select id="paymentTargetStudent"
+                         class="select select-bordered select-sm w-full bg-white/5 border-white/10"></select>
+                     <label>Montant & motif</label>
+-                    <div class="input-row">
+-                        <input type="number" id="paymentAmount" placeholder="Montant"
+-                            class="input input-bordered input-sm flex-1 bg-white/5 border-white/10">
+-                        <button class="btn btn-primary btn-sm px-5" onclick="sendPaymentRequest()">
+-                            <i data-lucide="send" class="w-4 h-4 mr-1"></i> Envoyer
+-                        </button>
+-                    </div>
++                    <input type="number" id="paymentAmount" placeholder="Montant"
++                        class="input input-bordered input-sm w-full bg-white/5 border-white/10">
+                     <input type="text" id="paymentDesc" placeholder="Motif (ex: Pull BDE, Cotisation...)"
+                         class="input input-bordered input-sm w-full bg-white/5 border-white/10">
++                    <button class="btn btn-primary btn-sm w-full mt-1" onclick="sendPaymentRequest()">
++                        <i data-lucide="send" class="w-4 h-4 mr-1"></i> Envoyer la demande
++                    </button>
+                 </div>
+             </div>
+ 
+diff --git a/public/admin-students.html b/public/admin-students.html
+index 565af08..d1aabd9 100644
+--- a/public/admin-students.html
++++ b/public/admin-students.html
+@@ -59,17 +59,13 @@
+                     <label>Informations de l'├®tudiant</label>
+                     <input type="text" id="newStudentName" placeholder="Nom complet"
+                         class="input input-bordered input-sm w-full bg-white/5 border-white/10">
+-                    <div class="input-row">
+-                        <input type="email" id="newStudentEmail" placeholder="Adresse email"
+-                            class="input input-bordered input-sm flex-1 bg-white/5 border-white/10">
+-                    </div>
+-                    <div class="input-row">
+-                        <input type="password" id="newStudentPassword" placeholder="Mot de passe provisoire"
+-                            class="input input-bordered input-sm flex-1 bg-white/5 border-white/10">
+-                        <button id="addStudentBtn" class="btn btn-primary btn-sm px-5">
+-                            <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Cr├®er
+-                        </button>
+-                    </div>
++                    <input type="email" id="newStudentEmail" placeholder="Adresse email"
++                        class="input input-bordered input-sm w-full bg-white/5 border-white/10">
++                    <input type="password" id="newStudentPassword" placeholder="Mot de passe provisoire"
++                        class="input input-bordered input-sm w-full bg-white/5 border-white/10">
++                    <button id="addStudentBtn" class="btn btn-primary btn-sm w-full mt-1">
++                        <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Cr├®er l'acc├¿s
++                    </button>
+                 </div>
+             </div>
+ 
+diff --git a/public/css/theme.css b/public/css/theme.css
+index ecdaf08..f86ccc7 100644
+--- a/public/css/theme.css
++++ b/public/css/theme.css
+@@ -641,6 +641,14 @@ body {
+ .admin-quick-link i { color: var(--accent); }
+ 
+ /* ÔöÇÔöÇ Admin form card ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */
++/* ÔöÇÔöÇ Global input overrides ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */
++.input,
++.select,
++textarea {
++  padding-left: 8px !important;
++  border-radius: var(--radius-md) !important;
++}
++
+ .admin-form-group {
+   display: flex;
+   flex-direction: column;
+@@ -659,6 +667,52 @@ body {
+   gap: 0.5rem;
+ }
+ 
++/* ÔöÇÔöÇ Password toggle wrapper ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */
++.password-wrapper {
++  position: relative;
++  width: 100%;
++}
++
++.password-wrapper .input {
++  padding-right: 44px !important;
++}
++
++.password-wrapper .toggle-password {
++  position: absolute;
++  right: 8px;
++  top: 50%;
++  transform: translateY(-50%);
++  background: none;
++  border: none;
++  color: var(--text-muted);
++  cursor: pointer;
++  padding: 4px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  transition: color var(--transition-base);
++}
++
++.password-wrapper .toggle-password:hover {
++  color: var(--text-primary);
++}
++
++/* ÔöÇÔöÇ Login page centered ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */
++.login-container {
++  display: flex;
++  justify-content: center;
++  align-items: center;
++  min-height: calc(100vh - 60px);
++  padding: 1.5rem;
++  position: relative;
++  z-index: 1;
++}
++
++.login-container .glass-card {
++  width: 100%;
++  max-width: 420px;
++}
++
+ /* ÔöÇÔöÇ Admin transaction row ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */
+ .admin-tx {
+   display: flex;
+diff --git a/public/login.html b/public/login.html
+index 2a5ecd4..dc83fcb 100644
+--- a/public/login.html
++++ b/public/login.html
+@@ -24,10 +24,10 @@
+         <a href="/" class="brand">Student Wallet</a>
+     </nav>
+ 
+-    <div class="flex justify-center px-4 pt-16 relative z-1">
+-        <div class="glass-card w-full max-w-md">
+-            <h1 class="text-2xl font-bold mb-1">Portail Epicoin</h1>
+-            <p class="text-sm opacity-50 mb-6">G├¿re tes points et tes ├®v├®nements</p>
++    <div class="login-container">
++        <div class="glass-card">
++            <h1 class="text-2xl font-bold mb-1 text-center">Portail Epicoin</h1>
++            <p class="text-sm opacity-50 mb-6 text-center">G├¿re tes points et tes ├®v├®nements</p>
+ 
+             <!-- Tabs -->
+             <div role="tablist" class="tabs tabs-bordered mb-6">
+@@ -39,13 +39,18 @@
+             <form id="loginForm">
+                 <div class="form-control mb-3">
+                     <label class="label"><span class="label-text text-white">Email</span></label>
+-                    <input type="email" id="loginEmail" required
++                    <input type="email" id="loginEmail" required placeholder="votre@email.fr"
+                         class="input input-bordered w-full bg-white/5 border-white/10">
+                 </div>
+-                <div class="form-control mb-4">
++                <div class="form-control mb-6">
+                     <label class="label"><span class="label-text text-white">Mot de passe</span></label>
+-                    <input type="password" id="loginPassword" required
+-                        class="input input-bordered w-full bg-white/5 border-white/10">
++                    <div class="password-wrapper">
++                        <input type="password" id="loginPassword" required placeholder="Entrez votre mot de passe"
++                            class="input input-bordered w-full bg-white/5 border-white/10">
++                        <button type="button" class="toggle-password" data-target="loginPassword" aria-label="Afficher le mot de passe">
++                            <i data-lucide="eye" class="w-5 h-5"></i>
++                        </button>
++                    </div>
+                 </div>
+                 <button type="submit" class="btn btn-primary w-full">Se Connecter</button>
+             </form>
+@@ -67,10 +72,15 @@
+                     <input type="email" id="regEmail" placeholder="admin@bde.fr" required
+                         class="input input-bordered w-full bg-white/5 border-white/10">
+                 </div>
+-                <div class="form-control mb-4">
++                <div class="form-control mb-6">
+                     <label class="label"><span class="label-text text-white">Mot de passe</span></label>
+-                    <input type="password" id="regPassword" required minlength="6"
+-                        class="input input-bordered w-full bg-white/5 border-white/10">
++                    <div class="password-wrapper">
++                        <input type="password" id="regPassword" required minlength="6" placeholder="6 caract├¿res minimum"
++                            class="input input-bordered w-full bg-white/5 border-white/10">
++                        <button type="button" class="toggle-password" data-target="regPassword" aria-label="Afficher le mot de passe">
++                            <i data-lucide="eye" class="w-5 h-5"></i>
++                        </button>
++                    </div>
+                 </div>
+                 <button type="submit" class="btn btn-primary w-full">Cr├®er le BDE</button>
+                 <p class="text-[10px] opacity-40 mt-4 text-center">Les comptes ├®tudiants sont cr├®├®s directement par l'administrateur du BDE.</p>
+@@ -100,6 +110,18 @@
+ 
+         const urlParams = new URLSearchParams(window.location.search);
+         if (urlParams.get('tab') === 'register') switchTab('registerLink');
++
++        // Password toggle
++        document.querySelectorAll('.toggle-password').forEach(btn => {
++            btn.addEventListener('click', () => {
++                const input = document.getElementById(btn.dataset.target);
++                const isHidden = input.type === 'password';
++                input.type = isHidden ? 'text' : 'password';
++                const icon = btn.querySelector('i');
++                icon.setAttribute('data-lucide', isHidden ? 'eye-off' : 'eye');
++                lucide.createIcons();
++            });
++        });
+     </script>
+ </body>
+ 
+diff --git a/public/profile.html b/public/profile.html
+index d69cd03..6118c2d 100644
+--- a/public/profile.html
++++ b/public/profile.html
+@@ -39,13 +39,19 @@
+     <div class="app-shell">
+         <div class="page-content">
+             <!-- Profile Header -->
+-            <div class="glass-card text-center">
++            <div class="glass-card">
++                <h3 class="font-semibold mb-4 flex items-center gap-2">
++                    <i data-lucide="user" class="w-5 h-5" style="color: var(--accent)"></i>
++                    Mon profil
++                </h3>
++                <div class="text-center">
+                 <div class="w-20 h-20 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-2xl font-bold text-white mx-auto mb-3">
+                     <span id="profileInitials">?</span>
+                 </div>
+                 <h2 id="profileName" class="text-xl font-bold">Chargement...</h2>
+                 <p id="profileEmail" class="text-sm opacity-50 mt-1">...</p>
+-                <div id="profileRole" class="badge badge-ghost mt-2">STUDENT</div>
++                <div id="profileRole" class="badge badge-ghost mt-2" style="padding: 0.35rem 0.85rem;">STUDENT</div>
++                </div>
+             </div>
+ 
+             <!-- BDE Information -->
+@@ -77,17 +83,17 @@
+                     <i data-lucide="settings" class="w-5 h-5"></i>
+                     Param├¿tres
+                 </h3>
+-                <div class="flex justify-between items-center py-2 border-b border-white/5">
++                <div class="flex justify-between items-center py-3 border-b border-white/5">
+                     <span>Notifications</span>
+                     <input type="checkbox" class="toggle toggle-sm toggle-primary" checked>
+                 </div>
+-                <div class="flex justify-between items-center py-2 border-b border-white/5">
++                <div class="flex justify-between items-center py-3 border-b border-white/5">
+                     <span>Th├¿me</span>
+                     <button id="themeToggle" class="btn btn-ghost btn-sm btn-circle">
+                         <i data-lucide="moon" class="w-4 h-4"></i>
+                     </button>
+                 </div>
+-                <div class="mt-4">
++                <div class="mt-5">
+                     <button id="logoutBtn" class="btn btn-outline btn-error w-full btn-sm">
+                         <i data-lucide="log-out" class="w-4 h-4"></i>
+                         Se D├®connecter
