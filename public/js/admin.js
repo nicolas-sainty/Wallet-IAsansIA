@@ -12,7 +12,7 @@ window.currentBdeId = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     // Check Auth
-    const userStored = JSON.parse(localStorage.getItem('user'));
+    const userStored = JSON.parse(sessionStorage.getItem('user'));
     if (!userStored) {
         window.location.href = '/login.html';
         return;
@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!finalBdeId) {
         try {
             const meRes = await fetch(`${ADMIN_API_BASE}/api/auth/me`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
             });
             if (meRes.ok) {
                 const meData = await meRes.json();
@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     finalBdeId = meData.bde_id;
                     // Update local storage
                     userStored.bde_id = finalBdeId;
-                    localStorage.setItem('user', JSON.stringify(userStored));
+                    sessionStorage.setItem('user', JSON.stringify(userStored));
                 }
             }
         } catch (e) { console.error("Failed to refresh user data", e); }
@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Fallback: fetch group where user is admin
         try {
             const res = await fetch(`${ADMIN_API_BASE}/api/groups`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
             });
             const groups = (await res.json()).data || [];
             const currentUserId = userStored.user_id || userStored.userId;
@@ -57,7 +57,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 window.currentBdeId = myGroup.group_id;
                 // Save it for next time
                 userStored.bde_id = window.currentBdeId;
-                localStorage.setItem('user', JSON.stringify(userStored));
+                sessionStorage.setItem('user', JSON.stringify(userStored));
             }
         } catch (e) { console.error(e); }
     }
@@ -142,7 +142,7 @@ async function loadDashboardStats() {
         if (!window.currentBdeId) return; // Wait for init
 
         const res = await fetch(`${ADMIN_API_BASE}/api/groups/${window.currentBdeId}/stats`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         const stats = (await res.json()).data;
 
@@ -151,7 +151,7 @@ async function loadDashboardStats() {
 
         // Fetch BDE Wallet (EUR)
         const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${window.currentBdeId}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         const wallets = (await wRes.json()).data;
         const eurWallet = wallets.find(w => w.currency === 'EUR');
@@ -177,7 +177,7 @@ async function loadStudents() {
 
     try {
         const res = await fetch(`${ADMIN_API_BASE}/api/groups/${window.currentBdeId}/members`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         if (!res.ok) {
             const errCtx = await res.json();
@@ -240,7 +240,7 @@ async function addStudent() {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json', 
-                'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                'Authorization': `Bearer ${sessionStorage.getItem('token')}` 
             },
             body: JSON.stringify({ email, fullName, password })
         });
@@ -273,7 +273,7 @@ async function loadAdminEvents() {
 
     try {
         const res = await fetch(`${ADMIN_API_BASE}/api/events?groupId=${encodeURIComponent(window.currentBdeId)}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         const payload = await res.json();
         const myEvents = payload.data || [];
@@ -315,7 +315,7 @@ async function createAdminEvent() {
     try {
         const res = await fetch(`${ADMIN_API_BASE}/api/events`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
             body: JSON.stringify({
                 groupId: window.currentBdeId,
                 title,
@@ -349,7 +349,7 @@ async function openParticipantsModal(eventId) {
 
     try {
         const res = await fetch(`${ADMIN_API_BASE}/api/events/pending`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         const all = (await res.json()).data;
         const pending = all.filter(p => p.event_id === eventId);
@@ -378,7 +378,7 @@ async function validatePart(pId, status) {
     try {
         await fetch(`${ADMIN_API_BASE}/api/events/participants/${pId}/validate`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
             body: JSON.stringify({ status })
         });
 
@@ -412,7 +412,7 @@ async function loadFinances() {
 async function loadPaymentRequests() {
     try {
         const res = await fetch(`${ADMIN_API_BASE}/api/payment/requests`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         const requests = (await res.json()).data;
 
@@ -444,7 +444,7 @@ async function sendPaymentRequest() {
     try {
         const res = await fetch(`${ADMIN_API_BASE}/api/payment/requests`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
             body: JSON.stringify({
                 studentUserId: studentId,
                 amount: amount,
@@ -467,14 +467,14 @@ async function loadTransactions() {
     // First get wallet ID
     try {
         const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${window.currentBdeId}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         const wallets = (await wRes.json()).data; // Array of wallets
 
         let allTxs = [];
         for (let w of wallets) {
             const tRes = await fetch(`${ADMIN_API_BASE}/api/wallets/${w.wallet_id}/transactions`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
             });
             const txs = (await tRes.json()).data;
             allTxs = [...allTxs, ...txs];

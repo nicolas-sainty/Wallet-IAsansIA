@@ -16,7 +16,7 @@ const webhookRoutes = require('../routes/webhooks.routes');
 
 const app = express();
 const PORT = process.env.API_PORT || process.env.PORT || 3000;
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 // Security middleware
 // Security middleware

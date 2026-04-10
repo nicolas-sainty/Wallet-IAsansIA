@@ -17,6 +17,19 @@ const state = {
     currentFilter: 'all',
 };
 
+function cleanLegacyStorage() {
+    // Prevent old tokens and accounts from persisting across sessions
+    try {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+    } catch (e) { }
+}
+cleanLegacyStorage();
+
+function isAuthenticated() {
+    return !!sessionStorage.getItem('token');
+}
+
 // ========================================
 // API Service
 // ========================================
@@ -1022,8 +1035,14 @@ async function init() {
 
     const user = JSON.parse(sessionStorage.getItem('user'));
 
+    // Global Auth Guard
+    if (!isAuthenticated() && !path.includes('login.html') && !path.includes('register.html')) {
+        window.location.href = '/login.html';
+        return;
+    }
+
     // BDE Admin Layout Override
-    if (checkAuth() && user && (user.role === 'bde_admin' || user.role === 'admin')) {
+    if (isAuthenticated() && user && (user.role === 'bde_admin' || user.role === 'admin')) {
 
         // 2. Override Bottom Nav
         const nav = document.querySelector('.bottom-nav');
