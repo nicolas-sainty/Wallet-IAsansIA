@@ -60,15 +60,13 @@
                     <select id="paymentTargetStudent"
                         class="select select-bordered select-sm w-full bg-white/5 border-white/10"></select>
                     <label>Montant & motif</label>
-                    <div class="input-row">
-                        <input type="number" id="paymentAmount" placeholder="Montant"
-                            class="input input-bordered input-sm flex-1 bg-white/5 border-white/10">
-                        <button class="btn btn-primary btn-sm px-5" onclick="sendPaymentRequest()">
-                            <i data-lucide="send" class="w-4 h-4 mr-1"></i> Envoyer
-                        </button>
-                    </div>
+                    <input type="number" id="paymentAmount" placeholder="Montant"
+                        class="input input-bordered input-sm w-full bg-white/5 border-white/10">
                     <input type="text" id="paymentDesc" placeholder="Motif (ex: Pull BDE, Cotisation...)"
                         class="input input-bordered input-sm w-full bg-white/5 border-white/10">
+                    <button class="btn btn-primary btn-sm w-full mt-1" onclick="sendPaymentRequest()">
+                        <i data-lucide="send" class="w-4 h-4 mr-1"></i> Envoyer la demande
+                    </button>
                 </div>
             </div>
 
