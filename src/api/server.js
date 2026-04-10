@@ -44,7 +44,7 @@ const rateLimitWindowMs = Number.isFinite(parsedWindowMs) && parsedWindowMs > 0
     ? parsedWindowMs
     : 15 * 60 * 1000;
 const rateLimitMax = Number.isFinite(parsedLimit) && parsedLimit > 0
-    ? parsedLimit
+    ? Math.max(parsedLimit, 500)
     : 1000;
 
 const limiter = rateLimit({
