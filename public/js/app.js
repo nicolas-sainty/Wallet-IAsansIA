@@ -524,6 +524,7 @@ function checkAuth() {
 
 function updateNavAuth() {
     const navActions = document.querySelector('.nav-actions');
+    if (!navActions) return;
     const isLoggedIn = checkAuth();
 
     if (isLoggedIn) {
@@ -1085,7 +1086,17 @@ async function init() {
     if (createGroupBtn) createGroupBtn.addEventListener('click', createGroup);
 
     const createEventBtn = document.getElementById('createEventBtn');
-    if (createEventBtn) createEventBtn.addEventListener('click', createEvent);
+    const isAdminPage = path.startsWith('/admin');
+    if (createEventBtn && !isAdminPage) createEventBtn.addEventListener('click', createEvent);
+
+    // Shop page: bind purchase actions
+    document.querySelectorAll('.btn-buy-product').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const productId = btn.dataset.productId;
+            if (!productId) return;
+            buyProduct(productId);
+        });
+    });
 
     // Initial Data Loading based on page presence
     try {

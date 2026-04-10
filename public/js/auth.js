@@ -48,7 +48,7 @@ document.getElementById('registerForm')?.addEventListener('submit', async (e) =>
     const password = document.getElementById('regPassword').value;
 
     try {
-        const res = await fetch(`${API_BASE}/api/v2/auth/bde/register`, {
+        const res = await fetch(`${API_BASE}/api/auth/bde/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bdeName, fullName, email, password })

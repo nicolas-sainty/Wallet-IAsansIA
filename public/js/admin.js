@@ -6,42 +6,20 @@
 const ADMIN_API_BASE = window.location.origin;
 window.currentBdeId = null;
 
-// Auth storage hardening: admin page script historically reads/writes localStorage.
-// Redirect auth keys to sessionStorage to avoid persistence and reduce token exposure.
-(function patchLocalStorageForAuthKeys() {
-    try {
-        const keys = new Set(['token', 'user']);
-        const ls = window.localStorage;
-        const originalGetItem = ls.getItem.bind(ls);
-        const originalSetItem = ls.setItem.bind(ls);
-        const originalRemoveItem = ls.removeItem.bind(ls);
-
-        ls.getItem = function (key) {
-            if (keys.has(key)) return sessionStorage.getItem(key);
-            return originalGetItem(key);
-        };
-        ls.setItem = function (key, value) {
-            if (keys.has(key)) return sessionStorage.setItem(key, value);
-            return originalSetItem(key, value);
-        };
-        ls.removeItem = function (key) {
-            if (keys.has(key)) return sessionStorage.removeItem(key);
-            return originalRemoveItem(key);
-        };
-    } catch (e) {
-        // If patching fails, we keep existing behavior.
-    }
-})();
-
 // ========================================
 // Initialization
 // ========================================
 
 document.addEventListener("DOMContentLoaded", async () => {
-    // Check Auth — only require a logged-in user (no role restriction)
+    // Check Auth
     const userStored = JSON.parse(localStorage.getItem('user'));
     if (!userStored) {
         window.location.href = '/login.html';
+        return;
+    }
+    if (userStored.role !== 'bde_admin' && userStored.role !== 'admin') {
+        alert("Accès refusé. Réservé aux administrateurs BDE.");
+        window.location.href = '/';
         return;
     }
 
@@ -72,8 +50,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             const res = await fetch(`${ADMIN_API_BASE}/api/groups`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
-            const groups = (await res.json()).data;
-            const myGroup = groups.find(g => g.admin_user_id === userStored.user_id);
+            const groups = (await res.json()).data || [];
+            const currentUserId = userStored.user_id || userStored.userId;
+            const myGroup = groups.find(g => g.admin_user_id === currentUserId);
             if (myGroup) {
                 window.currentBdeId = myGroup.group_id;
                 // Save it for next time
@@ -261,11 +240,11 @@ async function addStudent() {
     }
 
     try {
-        const res = await fetch(`${ADMIN_API_BASE}/api/v2/auth/bde/members`, {
+        const res = await fetch(`${ADMIN_API_BASE}/api/auth/bde/members`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json', 
-                'Authorization': `Bearer ${sessionStorage.getItem('token')}` 
+                'Authorization': `Bearer ${localStorage.getItem('token')}` 
             },
             body: JSON.stringify({ email, fullName, password })
         });
@@ -293,23 +272,26 @@ async function addStudent() {
 // ========================================
 
 async function loadAdminEvents() {
-    // Re-use existing GET /api/events logic but filtered? 
-    // Currently fetches all OPEN. We might need filtered list for admin to see DRAFT/CLOSED too.
-    const res = await fetch(`${ADMIN_API_BASE}/api/events`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    });
-    const events = (await res.json()).data;
-    const myEvents = events.filter(e => e.group_id === currentBdeId);
-
     const list = document.getElementById('adminEventsList');
-    if (myEvents.length === 0) {
-        list.innerHTML = '<div class="empty-state"><i data-lucide="calendar-off" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucun événement pour le moment.</p></div>';
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        return;
-    }
-    list.innerHTML = myEvents.map(e => {
-        const statusColor = e.status === 'OPEN' ? 'background:rgba(34,197,94,0.1);color:#22c55e' : 'background:rgba(255,255,255,0.06);color:var(--text-muted)';
-        return `
+    if (!list) return;
+
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/events`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const payload = await res.json();
+        const events = payload.data || [];
+        const myEvents = events.filter(e => e.group_id === window.currentBdeId);
+
+        if (myEvents.length === 0) {
+            list.innerHTML = '<div class="empty-state"><i data-lucide="calendar-off" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucun événement pour le moment.</p></div>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            return;
+        }
+
+        list.innerHTML = myEvents.map(e => {
+            const statusColor = e.status === 'OPEN' ? 'background:rgba(34,197,94,0.1);color:#22c55e' : 'background:rgba(255,255,255,0.06);color:var(--text-muted)';
+            return `
         <div class="admin-list-item">
             <div class="item-avatar" style="border-radius:var(--radius-md);background:rgba(139,92,246,0.1);color:#8b5cf6">
                 <i data-lucide="calendar" class="w-5 h-5"></i>
@@ -323,8 +305,12 @@ async function loadAdminEvents() {
                 <i data-lucide="users" class="w-4 h-4"></i>
             </button>
         </div>`;
-    }).join('');
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+        }).join('');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    } catch (e) {
+        console.error(e);
+        list.innerHTML = '<p class="error">Impossible de charger les événements.</p>';
+    }
 }
 
 async function createAdminEvent() {
@@ -332,14 +318,17 @@ async function createAdminEvent() {
     const date = document.getElementById('evtDate').value;
     const points = document.getElementById('evtPoints').value;
 
-    if (!title || !date || !points) return;
+    if (!title || !date || !points) {
+        alert("Veuillez remplir tous les champs de l'événement.");
+        return;
+    }
 
     try {
         const res = await fetch(`${ADMIN_API_BASE}/api/events`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: JSON.stringify({
-                groupId: currentBdeId,
+                groupId: window.currentBdeId,
                 title,
                 description: "Event via Admin",
                 eventDate: date,
@@ -349,10 +338,18 @@ async function createAdminEvent() {
         });
         if (res.ok) {
             alert("Événement créé");
-            loadAdminEvents();
-            // Clear form
+            document.getElementById('evtTitle').value = '';
+            document.getElementById('evtDate').value = '';
+            document.getElementById('evtPoints').value = '';
+            await loadAdminEvents();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            alert("Erreur création événement: " + (err.error || err.message || res.statusText));
         }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error(e);
+        alert("Erreur réseau lors de la création de l'événement.");
+    }
 }
 
 async function openParticipantsModal(eventId) {
@@ -486,7 +483,7 @@ async function loadTransactions() {
     // History of BDE wallet transactions (Polar.sh sales etc)
     // First get wallet ID
     try {
-        const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${currentBdeId}`, {
+        const wRes = await fetch(`${ADMIN_API_BASE}/api/wallets?groupId=${window.currentBdeId}`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const wallets = (await wRes.json()).data; // Array of wallets
