@@ -276,12 +276,11 @@ async function loadAdminEvents() {
     if (!list) return;
 
     try {
-        const res = await fetch(`${ADMIN_API_BASE}/api/events`, {
+        const res = await fetch(`${ADMIN_API_BASE}/api/events?groupId=${encodeURIComponent(window.currentBdeId)}`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const payload = await res.json();
-        const events = payload.data || [];
-        const myEvents = events.filter(e => e.group_id === window.currentBdeId);
+        const myEvents = payload.data || [];
 
         if (myEvents.length === 0) {
             list.innerHTML = '<div class="empty-state"><i data-lucide="calendar-off" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Aucun événement pour le moment.</p></div>';

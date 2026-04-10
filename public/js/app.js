@@ -783,8 +783,7 @@ function renderEvents() {
                     <small style="color: var(--text-muted); font-weight: 600;">Participants:</small>
                 </div>
             `;
-            // Auto-load participants for this event
-            setTimeout(() => loadEventParticipants(event.event_id), 100);
+            // Avoid request storms: participants are loaded on explicit admin views.
         } else {
             // Student View: Check registration status and show appropriate action
             // We'll check status asynchronously and update the card
@@ -799,20 +798,7 @@ function renderEvents() {
                         </button>
                     </div>
                 `;
-                // Check registration status asynchronously
-                setTimeout(async () => {
-                    const regStatus = await checkUserRegistrationStatus(event.event_id);
-                    const actionEl = document.getElementById(eventCardId);
-                    if (actionEl && regStatus) {
-                        if (regStatus === 'pending') {
-                            actionEl.innerHTML = `<span style="background: #f59e0b; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">⏳ En attente de validation</span>`;
-                        } else if (regStatus === 'verified') {
-                            actionEl.innerHTML = `<span style="background: #10b981; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">✅ Présence validée</span>`;
-                        } else if (regStatus === 'rejected') {
-                            actionEl.innerHTML = `<span style="background: #ef4444; color: white; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: block; text-align: center; font-weight: 600;">✗ Refusé</span>`;
-                        }
-                    }
-                }, 100);
+                // Keep a single action button; status is handled server-side on participation.
             } else if (status === 'FULL') {
                 actionArea = `<p style="color: #f59e0b; font-size: 0.8rem; margin-top: 0.5rem;">Complet</p>`;
             } else if (status === 'CLOSED') {

@@ -16,6 +16,7 @@ const webhookRoutes = require('../routes/webhooks.routes');
 
 const app = express();
 const PORT = process.env.API_PORT || process.env.PORT || 3000;
+app.set('trust proxy', true);
 
 // Security middleware
 // Security middleware
@@ -37,11 +38,22 @@ app.use(cors({
 }));
 
 // Rate limiting
+const parsedWindowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10);
+const parsedLimit = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10);
+const rateLimitWindowMs = Number.isFinite(parsedWindowMs) && parsedWindowMs > 0
+    ? parsedWindowMs
+    : 15 * 60 * 1000;
+const rateLimitMax = Number.isFinite(parsedLimit) && parsedLimit > 0
+    ? parsedLimit
+    : 1000;
+
 const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
-    limit: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 1000,
+    windowMs: rateLimitWindowMs,
+    limit: rateLimitMax,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
+    // Payment verification can legitimately retry for a short period after redirect.
+    skip: (req) => req.path === '/payment/verify-session',
     message: { error: 'Too many requests from this IP, please try again later' },
 });
 app.use('/api/', limiter);
