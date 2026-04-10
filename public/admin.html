@@ -39,70 +39,33 @@
 
     <div class="app-shell">
         <div class="page-content">
-            <!-- Page header -->
-            <div class="flex justify-between items-center">
-                <div>
-                    <h2 class="text-2xl font-bold">Dashboard</h2>
-                    <p class="text-sm opacity-50">Vue d'ensemble de votre BDE</p>
-                </div>
-                <a href="/" class="btn btn-ghost btn-sm btn-circle">
-                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Dashboard BDE</h2>
+                <a href="/" class="btn btn-ghost btn-sm">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    Retour
                 </a>
             </div>
 
-            <!-- Stat cards row -->
-            <div class="grid grid-cols-1 gap-3">
-                <div class="admin-stat">
-                    <div class="stat-icon orange">
-                        <i data-lucide="users" class="w-5 h-5"></i>
-                    </div>
-                    <div class="stat-info">
+            <!-- Stats -->
+            <div class="glass-card mb-4">
+                <h3 class="font-semibold mb-3 flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                    Vue d'ensemble
+                </h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="stat-box">
                         <div class="stat-val" id="statMembers">--</div>
-                        <div class="stat-lbl">Membres inscrits</div>
+                        <div class="stat-lbl">Membres</div>
                     </div>
-                </div>
-                <div class="admin-stat">
-                    <div class="stat-icon green">
-                        <i data-lucide="wallet" class="w-5 h-5"></i>
-                    </div>
-                    <div class="stat-info">
+                    <div class="stat-box">
                         <div class="stat-val" id="statBalance">-- €</div>
-                        <div class="stat-lbl">Solde Wallet EUR</div>
+                        <div class="stat-lbl">Wallet EUR</div>
                     </div>
-                </div>
-                <div class="admin-stat">
-                    <div class="stat-icon purple">
-                        <i data-lucide="trending-up" class="w-5 h-5"></i>
-                    </div>
-                    <div class="stat-info">
+                    <div class="stat-box col-span-2">
                         <div class="stat-val" id="statVolume">--</div>
-                        <div class="stat-lbl">Volume total (Crédits)</div>
+                        <div class="stat-lbl">Volume (Credits)</div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Quick links -->
-            <div class="glass-card">
-                <div class="admin-section-header">
-                    <h3><i data-lucide="zap" class="w-5 h-5"></i> Accès rapide</h3>
-                </div>
-                <div class="admin-quick-links">
-                    <a href="/admin-students.html" class="admin-quick-link">
-                        <i data-lucide="user-plus" class="w-6 h-6"></i>
-                        Gérer les étudiants
-                    </a>
-                    <a href="/admin-events.html" class="admin-quick-link">
-                        <i data-lucide="calendar-plus" class="w-6 h-6"></i>
-                        Créer un événement
-                    </a>
-                    <a href="/admin-finances.html" class="admin-quick-link">
-                        <i data-lucide="banknote" class="w-6 h-6"></i>
-                        Demandes de paiement
-                    </a>
-                    <a href="/profile.html" class="admin-quick-link">
-                        <i data-lucide="settings" class="w-6 h-6"></i>
-                        Mon profil
-                    </a>
                 </div>
             </div>
         </div>
