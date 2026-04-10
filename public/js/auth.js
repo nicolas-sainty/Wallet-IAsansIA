@@ -17,7 +17,7 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     const password = document.getElementById('loginPassword').value;
 
     try {
-        const res = await fetch(`${API_BASE}/api/auth/login`, {
+        const res = await fetch(`${API_BASE}/api/v2/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -45,7 +45,7 @@ document.getElementById('registerForm')?.addEventListener('submit', async (e) =>
     const password = document.getElementById('regPassword').value;
 
     try {
-        const res = await fetch(`${API_BASE}/api/auth/bde/register`, {
+        const res = await fetch(`${API_BASE}/api/v2/auth/bde/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bdeName, fullName, email, password })
@@ -55,12 +55,22 @@ document.getElementById('registerForm')?.addEventListener('submit', async (e) =>
         if (!res.ok) throw new Error(data.error);
 
         showToast('BDE créé avec succès ! Connectez-vous.', 'success');
-        // Switch to login tab
+        // Switch to login form
         setTimeout(() => {
-            const loginTab = document.querySelector('[data-target="loginLink"]');
-            if (loginTab) loginTab.click();
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = '';
         }, 1500);
     } catch (error) {
         showToast(error.message, 'error');
     }
+});
+
+// Toggle between login / register forms
+document.getElementById('showRegisterBtn')?.addEventListener('click', () => {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = '';
+});
+document.getElementById('showLoginBtn')?.addEventListener('click', () => {
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('loginForm').style.display = '';
 });
