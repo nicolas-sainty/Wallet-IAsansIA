@@ -4,7 +4,7 @@ const { requireAuth } = require('../../../../../middleware/auth.middleware');
 function createEventRoutes(eventController) {
     const router = express.Router();
 
-    router.get('/', (req, res) => eventController.getAll(req, res));
+    router.get('/', requireAuth, (req, res) => eventController.getAll(req, res));
     router.post('/', requireAuth, (req, res) => eventController.create(req, res));
     router.get('/pending', requireAuth, (req, res) => eventController.getPending(req, res));
     router.post('/participate/:id', requireAuth, (req, res) => eventController.participate(req, res)); // Corrected param order if needed

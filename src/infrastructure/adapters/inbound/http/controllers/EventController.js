@@ -13,7 +13,10 @@ class EventController {
 
     async getAll(req, res) {
         try {
-            const { groupId, status } = req.query;
+            const { status } = req.query;
+            // Un user ne doit voir que les events de son propre BDE (ou le groupId spécifié par précaution, bien qu'on enforce le sien)
+            const groupId = req.query.groupId || req.user.bde_id;
+            
             const events = await this.getEventsUseCase.execute({ groupId, status });
             
             // Map back to snake_case for frontend compatibility

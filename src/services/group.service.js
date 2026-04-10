@@ -350,6 +350,7 @@ class GroupService {
                 .from('wallets')
                 .select('*')
                 .eq('group_id', groupId)
+                .not('user_id', 'is', null)
                 .eq('status', 'active')
                 .order('created_at', { ascending: false });
 

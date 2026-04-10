@@ -17,22 +17,16 @@ const state = {
     currentFilter: 'all',
 };
 
-function migrateLocalStorageToSession() {
-    // Backward compatibility: move token/user once from localStorage to sessionStorage.
+function cleanLegacyStorage() {
+    // Supprime toute trace de tokens persistants (sécurité XSS & éviter les sessions fantômes)
     try {
-        const legacyToken = localStorage.getItem('token');
-        const legacyUser = localStorage.getItem('user');
-        if (legacyToken && !sessionStorage.getItem('token')) {
-            sessionStorage.setItem('token', legacyToken);
-        }
-        if (legacyUser && !sessionStorage.getItem('user')) {
-            sessionStorage.setItem('user', legacyUser);
-        }
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
     } catch (e) {
         // ignore
     }
 }
-migrateLocalStorageToSession();
+cleanLegacyStorage();
 
 // ========================================
 // API Service
@@ -758,14 +752,15 @@ async function init() {
         }
     }
 
+    // Global Auth Guard
+    if (!isAuthenticated() && !path.includes('login.html') && !path.includes('register.html')) {
+        window.location.href = '/login.html';
+        return; // Stop execution
+    }
+
     if (path === '/' || path === '/index.html') {
-        if (isAuthenticated()) {
-            await loadCardData();
-            await loadGroupsForPay();
-        } else {
-            // Redirect to Login if not auth
-            window.location.href = '/login.html';
-        }
+        await loadCardData();
+        await loadGroupsForPay();
     } else if (path.includes('events.html')) {
         await loadEvents();
         // Load event listeners for create modal if exists

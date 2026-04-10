@@ -15,6 +15,8 @@ class SupabaseEventRepository {
         if (filters.groupId) query = query.eq('group_id', filters.groupId);
         if (filters.status) query = query.eq('status', filters.status);
 
+        query = query.order('event_date', { ascending: true });
+
         const { data, error } = await query;
         if (error) throw error;
         return (data || []).map(e => new Event(e));
