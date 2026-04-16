@@ -39,32 +39,43 @@
 
     <div class="app-shell">
         <div class="page-content">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold">Étudiants</h2>
-                <a href="/admin.html" class="btn btn-ghost btn-sm">
-                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
-                    Dashboard
+            <!-- Page header -->
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold">Étudiants</h2>
+                    <p class="text-sm opacity-50">Gestion des membres du BDE</p>
+                </div>
+                <a href="/admin.html" class="btn btn-ghost btn-sm btn-circle">
+                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
                 </a>
             </div>
 
+            <!-- Add student form -->
             <div class="glass-card">
-                <div class="flex flex-col gap-2 mb-4">
-                    <div class="flex gap-2">
-                        <input type="text" id="newStudentName" placeholder="Nom de l'étudiant..."
-                            class="input input-bordered input-sm flex-1 bg-white/5 border-white/10">
-                        <input type="email" id="newStudentEmail" placeholder="Email étudiant..."
-                            class="input input-bordered input-sm flex-1 bg-white/5 border-white/10">
-                    </div>
-                    <div class="flex gap-2">
-                        <input type="password" id="newStudentPassword" placeholder="Mot de passe provisoire..."
-                            class="input input-bordered input-sm flex-1 bg-white/5 border-white/10">
-                        <button id="addStudentBtn" class="btn btn-primary btn-sm px-4">
-                            <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Créer Accès
-                        </button>
-                    </div>
+                <div class="admin-section-header">
+                    <h3><i data-lucide="user-plus" class="w-5 h-5"></i> Créer un accès étudiant</h3>
                 </div>
-                <div id="studentsList">
-                    <p class="opacity-40 text-sm">Chargement...</p>
+                <div class="admin-form-group">
+                    <label>Informations de l'étudiant</label>
+                    <input type="text" id="newStudentName" placeholder="Nom complet"
+                        class="input input-bordered input-sm w-full bg-white/5 border-white/10">
+                    <input type="email" id="newStudentEmail" placeholder="Adresse email"
+                        class="input input-bordered input-sm w-full bg-white/5 border-white/10">
+                    <input type="password" id="newStudentPassword" placeholder="Mot de passe provisoire"
+                        class="input input-bordered input-sm w-full bg-white/5 border-white/10">
+                    <button id="addStudentBtn" class="btn btn-primary btn-sm w-full mt-1">
+                        <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Créer l'accès
+                    </button>
+                </div>
+            </div>
+
+            <!-- Students list -->
+            <div class="glass-card">
+                <div class="admin-section-header">
+                    <h3><i data-lucide="users" class="w-5 h-5"></i> Liste des membres</h3>
+                </div>
+                <div id="studentsList" class="flex flex-col gap-2">
+                    <p class="opacity-40 text-sm text-center py-4">Chargement...</p>
                 </div>
             </div>
         </div>

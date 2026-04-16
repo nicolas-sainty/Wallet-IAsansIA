@@ -39,38 +39,47 @@
 
     <div class="app-shell">
         <div class="page-content">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold">Événements</h2>
-                <a href="/admin.html" class="btn btn-ghost btn-sm">
-                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
-                    Dashboard
+            <!-- Page header -->
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold">Événements</h2>
+                    <p class="text-sm opacity-50">Créer et gérer les événements BDE</p>
+                </div>
+                <a href="/admin.html" class="btn btn-ghost btn-sm btn-circle">
+                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
                 </a>
             </div>
 
-            <div class="glass-card mb-4">
-                <h3 class="font-semibold mb-3 flex items-center gap-2">
-                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                    Nouveau
-                </h3>
-                <div class="flex flex-col gap-2">
-                    <input type="text" id="evtTitle" placeholder="Titre"
+            <!-- Create event form -->
+            <div class="glass-card">
+                <div class="admin-section-header">
+                    <h3><i data-lucide="calendar-plus" class="w-5 h-5"></i> Nouvel événement</h3>
+                </div>
+                <div class="admin-form-group">
+                    <label>Titre de l'événement</label>
+                    <input type="text" id="evtTitle" placeholder="Ex : Soirée d'intégration"
                         class="input input-bordered input-sm w-full bg-white/5 border-white/10">
-                    <div class="flex gap-2">
+                    <label>Date & récompense</label>
+                    <div class="input-row">
                         <input type="date" id="evtDate"
                             class="input input-bordered input-sm flex-1 bg-white/5 border-white/10">
-                        <input type="number" id="evtPoints" placeholder="Pts"
-                            class="input input-bordered input-sm w-20 bg-white/5 border-white/10">
+                        <input type="number" id="evtPoints" placeholder="Points"
+                            class="input input-bordered input-sm bg-white/5 border-white/10" style="width:90px">
                     </div>
-                    <button id="createEventBtn" class="btn btn-primary btn-sm w-full">Créer événement</button>
+                    <button id="createEventBtn" class="btn btn-primary btn-sm w-full">
+                        <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Créer l'événement
+                    </button>
                 </div>
             </div>
 
+            <!-- Events list -->
             <div class="glass-card">
-                <h3 class="font-semibold mb-3 flex items-center gap-2">
-                    <i data-lucide="list" class="w-5 h-5"></i>
-                    Liste
-                </h3>
-                <div id="adminEventsList"></div>
+                <div class="admin-section-header">
+                    <h3><i data-lucide="list" class="w-5 h-5"></i> Événements du BDE</h3>
+                </div>
+                <div id="adminEventsList" class="flex flex-col gap-2">
+                    <p class="opacity-40 text-sm text-center py-4">Chargement...</p>
+                </div>
             </div>
         </div>
 

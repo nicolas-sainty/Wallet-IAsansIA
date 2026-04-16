@@ -2,6 +2,33 @@
 // Student Wallet - App Logic
 // ========================================
 
+// ── Theme toggle (runs immediately) ─────
+(function initTheme() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('themeToggle');
+        if (!btn) return;
+
+        function updateIcon(theme) {
+            const iconName = theme === 'light' ? 'sun' : 'moon';
+            btn.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4"></i>`;
+            if (window.lucide) lucide.createIcons();
+        }
+
+        updateIcon(saved);
+
+        btn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateIcon(next);
+        });
+    });
+})();
+
 const API_BASE = window.location.origin;
 
 // ========================================
@@ -56,7 +83,7 @@ const api = {
 
         if (response.status === 401 && retryOn401) {
             // Refresh access token via HttpOnly cookie.
-            const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, {
+            const refreshRes = await fetch(`${API_BASE}/api/v2/auth/refresh`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
@@ -190,7 +217,7 @@ async function loadCardData() {
 
         // Fetch User Wallet (CREDITS)
         // Use existing /api/wallets endpoint with userId query
-        const result = await api.get(`/api/wallets?userId=${user.userId || user.user_id}`);
+        const result = await api.get(`/api/v2/wallets?userId=${user.userId || user.user_id}`);
         const wallets = result.data || [];
 
         // Find CREDITS wallet (or first available if none specific)
@@ -211,7 +238,7 @@ async function loadCardData() {
         // Load History (Placeholder or real)
         const activityList = document.getElementById('recentTransactionsList');
         if (activityList && creditWallet) {
-            const txResult = await api.get(`/api/wallets/${creditWallet.wallet_id}/transactions`);
+            const txResult = await api.get(`/api/v2/wallets/${creditWallet.wallet_id}/transactions`);
             const txs = txResult.data || [];
             if (txs.length === 0) {
                 activityList.innerHTML = `
@@ -252,7 +279,7 @@ async function loadGroupsForPay() {
             return;
         }
 
-        const result = await api.get(`/api/groups/${user.bde_id}`);
+        const result = await api.get(`/api/v2/groups/${user.bde_id}`);
         const group = result.data;
 
         if (group) {
@@ -270,7 +297,7 @@ async function loadHomeRequests() {
     if (!container) return;
 
     try {
-        const res = await api.get('/api/payment/requests');
+        const res = await api.get('/api/v2/payment/requests');
         const requests = res.data || [];
 
         if (requests.length > 0) {
@@ -294,7 +321,7 @@ async function loadHomeRequests() {
                 window.respondRequestHome = async (reqId, action) => {
                     if (!confirm(action === 'PAY' ? "Confirmer le paiement ?" : "Refuser la demande ?")) return;
                     try {
-                        await api.post(`/api/payment/requests/${reqId}/respond`, { action });
+                        await api.post(`/api/v2/payment/requests/${reqId}/respond`, { action });
                         showToast("Action effectuée !", "success");
                         setTimeout(() => window.location.reload(), 500);
                     } catch (e) { showToast(e.message, 'error'); }
@@ -336,7 +363,7 @@ async function processPayment() {
     }
 
     try {
-        await api.post('/api/transactions/pay', {
+        await api.post('/api/v2/transactions/pay', {
             userId: user.userId || user.user_id, // Check how userId is stored
             groupId: groupId,
             amount: amount
@@ -356,7 +383,7 @@ async function processPayment() {
 
 async function loadEvents() {
     try {
-        const result = await api.get('/api/events');
+        const result = await api.get('/api/v2/events');
         state.events = result.data || [];
         renderEvents();
     } catch (error) {
@@ -491,7 +518,7 @@ async function checkUserRegistrationStatus(eventId) {
     if (!user) return null;
 
     try {
-        const result = await api.get(`/api/events/${eventId}/participants`);
+        const result = await api.get(`/api/v2/events/${eventId}/participants`);
         const participants = result.data || [];
         const userParticipation = participants.find(p => p.user_id === (user.userId || user.user_id));
         return userParticipation ? userParticipation.status : null;
@@ -525,7 +552,7 @@ async function participateInEvent(eventId) {
     `;
 
     try {
-        await api.post(`/api/events/${eventId}/participate`, {});
+        await api.post(`/api/v2/events/${eventId}/participate`, {});
         actionContainer.innerHTML = `<span class="badge badge-success w-full py-3">Présence validée</span>`;
         showToast('Inscription réussie !', 'success');
 
@@ -547,7 +574,7 @@ async function loadEventParticipants(eventId) {
     container.innerHTML = '<small>Chargement...</small>';
 
     try {
-        const result = await api.get('/api/events/pending');
+        const result = await api.get('/api/v2/events/pending');
         const allPending = result.data || [];
         const eventPending = allPending.filter(p => p.event_id === eventId);
 
@@ -575,7 +602,7 @@ async function loadEventParticipants(eventId) {
 
 async function validateParticipation(participantId, status) {
     try {
-        await api.post(`/api/events/participants/${participantId}/validate`, { status });
+        await api.post(`/api/v2/events/participants/${participantId}/validate`, { status });
         showToast(status === 'verified' ? 'Validé !' : 'Rejeté', 'success');
         // Refresh the specific list? Hard to access parent ID here easily without DOM trav.
         showToast('Refresh manuel requis pour voir les changements (Demo)', 'info');
@@ -614,7 +641,7 @@ async function buyProduct(productId) {
 
     try {
         showToast('Redirection vers Stripe...', 'info');
-        const res = await api.post('/api/payment/create-checkout-session', {
+        const res = await api.post('/api/v2/payment/create-checkout-session', {
             amount,
             credits
         });
@@ -638,11 +665,11 @@ async function createEvent() {
 
     // Need group ID. For demo, fetch groups and pick first.
     try {
-        const grpRes = await api.get('/api/groups');
+        const grpRes = await api.get('/api/v2/groups');
         if (!grpRes.data || grpRes.data.length === 0) {
             alert("Aucun groupe BDE trouvé."); return;
         }
-        await api.post('/api/events', {
+        await api.post('/api/v2/events', {
             groupId: grpRes.data[0].group_id,
             title,
             description: 'Event Mobile',
