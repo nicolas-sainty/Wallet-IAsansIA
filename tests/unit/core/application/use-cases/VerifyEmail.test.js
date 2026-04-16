@@ -1,4 +1,4 @@
-const VerifyEmail = require('../../../../../../src/core/application/use-cases/VerifyEmail.js');
+const VerifyEmail = require('../../../../../src/core/application/use-cases/VerifyEmail.js');
 
 describe('VerifyEmail Use Case', () => {
     let mockUserRepository, mockLogger;

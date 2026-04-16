@@ -1,4 +1,4 @@
-const GetParticipants = require('../../../../../../src/core/application/use-cases/GetParticipants.js');
+const GetParticipants = require('../../../../../src/core/application/use-cases/GetParticipants.js');
 
 describe('GetParticipants Use Case', () => {
     let mockEventRepository;

@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
@@ -13,10 +13,6 @@ const eventsRoutes = require('../routes/events.routes');
 const authRoutes = require('../routes/auth.routes');
 const paymentRoutes = require('../routes/payment.routes');
 const webhookRoutes = require('../routes/webhooks.routes');
-const intercampusRoutes = require('../routes/intercampus.routes');
-const bootstrap = require('../infrastructure/di');
-
-const v2Routes = bootstrap();
 
 const app = express();
 const PORT = process.env.API_PORT || process.env.PORT || 3000;
@@ -121,20 +117,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
-// Hexagonal Architecture V2 Routes
-app.use('/api/v2/transactions', v2Routes.transactionRoutesHex);
-app.use('/api/v2/wallets', v2Routes.walletRoutesHex);
-app.use('/api/v2/auth', v2Routes.authRoutesHex);
-app.use('/api/v2/groups', v2Routes.groupRoutesHex);
-app.use('/api/v2/events', v2Routes.eventRoutesHex);
-app.use('/api/v2/payment', v2Routes.paymentRoutesHex);
-
-// ─── Routes inter-campus (montées à la racine, standard EpiPay) ───────────
-// POST /intercampus-send    — Envoyer des EpiCoins à un campus partenaire
-// POST /intercampus-receive — Recevoir des EpiCoins d'un campus partenaire
-app.use('/', intercampusRoutes);
-
-
 // Static files (frontend)
 app.use(express.static('public'));
 
@@ -164,12 +146,12 @@ app.use((err, req, res, next) => {
 
 // Start server
 const server = app.listen(PORT, () => {
-    logger.info(`🚀 Epicoin API server running on port ${PORT}`);
-    logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    logger.info(`🔗 API Documentation: http://localhost:${PORT}/api`);
-    console.log(`\n✓ Server ready at http://localhost:${PORT}`);
-    console.log(`✓ API Documentation: http://localhost:${PORT}/api`);
-    console.log(`✓ Health Check: http://localhost:${PORT}/health\n`);
+    logger.info(`­ƒÜÇ Epicoin API server running on port ${PORT}`);
+    logger.info(`­ƒôè Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`­ƒöù API Documentation: http://localhost:${PORT}/api`);
+    console.log(`\nÔ£ô Server ready at http://localhost:${PORT}`);
+    console.log(`Ô£ô API Documentation: http://localhost:${PORT}/api`);
+    console.log(`Ô£ô Health Check: http://localhost:${PORT}/health\n`);
 });
 
 // Graceful shutdown

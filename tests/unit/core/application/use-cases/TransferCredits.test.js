@@ -1,4 +1,4 @@
-const TransferCredits = require('../../../../../../src/core/application/use-cases/TransferCredits');
+const TransferCredits = require('../../../../../src/core/application/use-cases/TransferCredits');
 
 describe('TransferCredits Use Case', () => {
     let mockWalletRepo, mockTxRepo, mockInitiateTx, mockProcessTx, mockLogger, transferCredits;

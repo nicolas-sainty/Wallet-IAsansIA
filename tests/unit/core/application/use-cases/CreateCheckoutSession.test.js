@@ -1,4 +1,4 @@
-const CreateCheckoutSession = require('../../../../../../src/core/application/use-cases/CreateCheckoutSession.js');
+const CreateCheckoutSession = require('../../../../../src/core/application/use-cases/CreateCheckoutSession.js');
 
 describe('CreateCheckoutSession Use Case', () => {
     let mockPaymentProcessor, mockLogger;

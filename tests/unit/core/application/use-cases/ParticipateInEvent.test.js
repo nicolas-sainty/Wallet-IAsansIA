@@ -1,4 +1,4 @@
-const ParticipateInEvent = require('../../../../../../src/core/application/use-cases/ParticipateInEvent.js');
+const ParticipateInEvent = require('../../../../../src/core/application/use-cases/ParticipateInEvent.js');
 
 describe('ParticipateInEvent Use Case', () => {
     let mockEventRepository, mockWalletRepository, mockLogger;

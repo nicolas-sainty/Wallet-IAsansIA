@@ -1,4 +1,4 @@
-const GetWalletBalance = require('../../../../../../src/core/application/use-cases/GetWalletBalance.js');
+const GetWalletBalance = require('../../../../../src/core/application/use-cases/GetWalletBalance.js');
 
 describe('GetWalletBalance Use Case', () => {
     let mockWalletRepository;

@@ -1,0 +1,101 @@
+﻿commit 973cc9fc19e35f649998071752c8aefc037ab27c
+Author: Gs <gs.duplaix@gmail.com>
+Date:   Fri Apr 10 16:16:46 2026 +0200
+
+    Refacto UI Admin/Supression du role check
+    
+    Co-authored-by: Florent Canales florent.canales@epitech.digital
+
+diff --git a/public/js/auth.js b/public/js/auth.js
+index 2e9f052..4728e71 100644
+--- a/public/js/auth.js
++++ b/public/js/auth.js
+@@ -17,7 +17,7 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+     const password = document.getElementById('loginPassword').value;
+ 
+     try {
+-        const res = await fetch(`${API_BASE}/api/auth/login`, {
++        const res = await fetch(`${API_BASE}/api/v2/auth/login`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ email, password })
+@@ -45,7 +45,7 @@ document.getElementById('registerForm')?.addEventListener('submit', async (e) =>
+     const password = document.getElementById('regPassword').value;
+ 
+     try {
+-        const res = await fetch(`${API_BASE}/api/auth/bde/register`, {
++        const res = await fetch(`${API_BASE}/api/v2/auth/bde/register`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ bdeName, fullName, email, password })
+@@ -55,12 +55,22 @@ document.getElementById('registerForm')?.addEventListener('submit', async (e) =>
+         if (!res.ok) throw new Error(data.error);
+ 
+         showToast('BDE cr├®├® avec succ├¿s ! Connectez-vous.', 'success');
+-        // Switch to login tab
++        // Switch to login form
+         setTimeout(() => {
+-            const loginTab = document.querySelector('[data-target="loginLink"]');
+-            if (loginTab) loginTab.click();
++            document.getElementById('registerForm').style.display = 'none';
++            document.getElementById('loginForm').style.display = '';
+         }, 1500);
+     } catch (error) {
+         showToast(error.message, 'error');
+     }
+ });
++
++// Toggle between login / register forms
++document.getElementById('showRegisterBtn')?.addEventListener('click', () => {
++    document.getElementById('loginForm').style.display = 'none';
++    document.getElementById('registerForm').style.display = '';
++});
++document.getElementById('showLoginBtn')?.addEventListener('click', () => {
++    document.getElementById('registerForm').style.display = 'none';
++    document.getElementById('loginForm').style.display = '';
++});
+
+commit 23e177223e8eac52bce0f8cce6361195e5b2dc32
+Author: nicolas-sainty <72015487+nicolas-sainty@users.noreply.github.com>
+Date:   Fri Apr 10 14:59:32 2026 +0200
+
+    le fix de la mort
+
+diff --git a/public/js/auth.js b/public/js/auth.js
+index e22085c..2e9f052 100644
+--- a/public/js/auth.js
++++ b/public/js/auth.js
+@@ -26,11 +26,8 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+         const data = await res.json();
+         if (!res.ok) throw new Error(data.error);
+ 
+-        // Keep both storages aligned: the rest of the app reads localStorage.
+-        localStorage.setItem('token', data.token);
+-        localStorage.setItem('user', JSON.stringify(data.user));
+-        try { sessionStorage.setItem('token', data.token); } catch (e) { }
+-        try { sessionStorage.setItem('user', JSON.stringify(data.user)); } catch (e) { }
++        sessionStorage.setItem('token', data.token);
++        sessionStorage.setItem('user', JSON.stringify(data.user));
+ 
+         showToast('Connexion r├®ussie', 'success');
+         setTimeout(() => window.location.href = '/', 1000);
+
+commit 2bd290c7312f873ba3cd3955cb7c4d05b1da73e1
+Author: jean-poll <degert.contact@gmail.com>
+Date:   Fri Apr 10 11:07:36 2026 +0200
+
+    fix: restore shop actions and admin panel API flows
+
+diff --git a/public/js/auth.js b/public/js/auth.js
+index c24cacc..e22085c 100644
+--- a/public/js/auth.js
++++ b/public/js/auth.js
+@@ -48,7 +48,7 @@ document.getElementById('registerForm')?.addEventListener('submit', async (e) =>
+     const password = document.getElementById('regPassword').value;
+ 
+     try {
+-        const res = await fetch(`${API_BASE}/api/v2/auth/bde/register`, {
++        const res = await fetch(`${API_BASE}/api/auth/bde/register`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ bdeName, fullName, email, password })

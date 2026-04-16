@@ -1,4 +1,4 @@
-const RespondToPaymentRequest = require('../../../../../../src/core/application/use-cases/RespondToPaymentRequest.js');
+const RespondToPaymentRequest = require('../../../../../src/core/application/use-cases/RespondToPaymentRequest.js');
 
 describe('RespondToPaymentRequest Use Case', () => {
     let mockTransactionRepository, mockWalletRepository, mockProcessTransactionUseCase, mockLogger;

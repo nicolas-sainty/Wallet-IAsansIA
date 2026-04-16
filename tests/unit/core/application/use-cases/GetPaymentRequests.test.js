@@ -1,4 +1,4 @@
-const GetPaymentRequests = require('../../../../../../src/core/application/use-cases/GetPaymentRequests.js');
+const GetPaymentRequests = require('../../../../../src/core/application/use-cases/GetPaymentRequests.js');
 
 describe('GetPaymentRequests Use Case', () => {
     let mockTransactionRepository;

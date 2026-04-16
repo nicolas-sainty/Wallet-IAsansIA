@@ -1,4 +1,4 @@
-const GetEvents = require('../../../../../../src/core/application/use-cases/GetEvents');
+const GetEvents = require('../../../../../src/core/application/use-cases/GetEvents');
 
 describe('GetEvents Use Case', () => {
     let mockEventRepo, getEvents;

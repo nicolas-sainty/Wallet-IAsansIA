@@ -1,4 +1,4 @@
-const ValidateParticipation = require('../../../../../../src/core/application/use-cases/ValidateParticipation.js');
+const ValidateParticipation = require('../../../../../src/core/application/use-cases/ValidateParticipation.js');
 
 describe('ValidateParticipation Use Case', () => {
     let mockEventRepository, mockWalletRepository, mockTransactionRepository, mockLogger;

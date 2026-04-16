@@ -1,4 +1,4 @@
-const CreateEvent = require('../../../../../../src/core/application/use-cases/CreateEvent');
+const CreateEvent = require('../../../../../src/core/application/use-cases/CreateEvent');
 
 describe('CreateEvent Use Case', () => {
     let mockEventRepository;

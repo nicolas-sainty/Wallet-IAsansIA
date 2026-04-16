@@ -1,4 +1,4 @@
-const RefreshToken = require('../../../../../../src/core/application/use-cases/RefreshToken.js');
+const RefreshToken = require('../../../../../src/core/application/use-cases/RefreshToken.js');
 
 describe('RefreshToken Use Case', () => {
     let mockUserRepository, mockLogger, mockJwtConfig;

@@ -1,4 +1,4 @@
-const RegisterUser = require('../../../../../../src/core/application/use-cases/RegisterUser.js');
+const RegisterUser = require('../../../../../src/core/application/use-cases/RegisterUser.js');
 
 describe('RegisterUser Use Case', () => {
     let mockUserRepository, mockWalletRepository, mockEmailProvider, mockHashProvider, mockLogger;

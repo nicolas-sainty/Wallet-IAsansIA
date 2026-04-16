@@ -1,4 +1,4 @@
-const CreateGroup = require('../../../../../../src/core/application/use-cases/CreateGroup.js');
+const CreateGroup = require('../../../../../src/core/application/use-cases/CreateGroup.js');
 
 describe('CreateGroup Use Case', () => {
     let mockGroupRepository, mockLogger;

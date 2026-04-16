@@ -1,4 +1,4 @@
-const InitiateTransaction = require('../../../../../../src/core/application/use-cases/InitiateTransaction.js');
+const InitiateTransaction = require('../../../../../src/core/application/use-cases/InitiateTransaction.js');
 
 describe('InitiateTransaction Use Case', () => {
     let mockWalletRepository, mockTransactionRepository, mockLogger;

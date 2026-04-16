@@ -1,4 +1,4 @@
-const GetPendingParticipations = require('../../../../../../src/core/application/use-cases/GetPendingParticipations.js');
+const GetPendingParticipations = require('../../../../../src/core/application/use-cases/GetPendingParticipations.js');
 
 describe('GetPendingParticipations Use Case', () => {
     let mockEventRepository;

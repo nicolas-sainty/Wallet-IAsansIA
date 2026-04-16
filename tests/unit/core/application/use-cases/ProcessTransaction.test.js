@@ -1,4 +1,4 @@
-const ProcessTransaction = require('../../../../../../src/core/application/use-cases/ProcessTransaction');
+const ProcessTransaction = require('../../../../../src/core/application/use-cases/ProcessTransaction');
 
 describe('ProcessTransaction Use Case', () => {
     let mockWalletRepo, mockTxRepo, mockLogger, processTx;

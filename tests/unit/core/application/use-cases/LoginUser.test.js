@@ -1,4 +1,4 @@
-const LoginUser = require('../../../../../../src/core/application/use-cases/LoginUser.js');
+const LoginUser = require('../../../../../src/core/application/use-cases/LoginUser.js');
 
 describe('LoginUser Use Case', () => {
     let mockUserRepository, mockHashProvider, mockLogger, mockJwtConfig;

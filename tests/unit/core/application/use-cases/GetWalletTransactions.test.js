@@ -1,4 +1,4 @@
-const GetWalletTransactions = require('../../../../../../src/core/application/use-cases/GetWalletTransactions.js');
+const GetWalletTransactions = require('../../../../../src/core/application/use-cases/GetWalletTransactions.js');
 
 describe('GetWalletTransactions Use Case', () => {
     let mockTransactionRepository;

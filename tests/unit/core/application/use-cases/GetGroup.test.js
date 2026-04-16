@@ -1,4 +1,4 @@
-const GetGroup = require('../../../../../../src/core/application/use-cases/GetGroup');
+const GetGroup = require('../../../../../src/core/application/use-cases/GetGroup');
 
 describe('GetGroup Use Case', () => {
     let mockGroupRepo, getGroup;
