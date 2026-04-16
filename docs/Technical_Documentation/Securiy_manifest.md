@@ -37,11 +37,17 @@ Dans le secteur bancaire, le *Know Your Customer* (KYC) impose la vérification 
 * **Validation des accès sensibles :** Les droits d'administrateur (accès au Dashboard BDE, scan des participants) ne sont pas ouverts par défaut. Ils font l'objet d'une activation manuelle après vérification physique de l'identité de l'étudiant responsable.
 
 ## 2.2 Prévention de la Fraude
-Même sans les moyens d'une grande institution financière, nous avons implémenté des barrières logiques pour garantir l'intégrité des fonds :
+Nous avons implémenté des barrières logiques et des algorithmes de détection pour garantir l'intégrité des fonds et prévenir les comportements malveillants :
 
-* **Vérification de la signature des Webhooks (Stripe) :** C'est un point critique de notre sécurité. Pour éviter qu'un utilisateur malveillant ne simule une confirmation de paiement pour obtenir des crédits gratuitement, notre backend Node.js vérifie systématiquement la signature cryptographique envoyée par Stripe lors de chaque transaction. Sans signature valide, la transaction est ignorée.
-* **Contrôle du solde "Côté Serveur" :** Par mesure de sécurité, aucun calcul de solde n'est effectué sur le frontend (Vanilla JS). Le code navigateur de l'utilisateur pourrait être modifié. Toutes les opérations de débit/crédit sont calculées par notre serveur Node.js et validées directement par les règles de la base de données Supabase.
-* **Plafonds de sécurité :** Afin de limiter l'impact d'une éventuelle fraude ou d'une erreur de manipulation, nous prévoyons des limites journalières de rechargement et de virement.
+* **Vérification de la signature des Webhooks (Stripe) :** C'est un point critique. Pour éviter qu'un utilisateur ne simule une confirmation de paiement via un outil comme Postman, notre backend Node.js vérifie systématiquement la signature cryptographique envoyée par Stripe. Sans signature valide, l'ajout de crédits est rejeté.
+* **Contrôle du solde "Côté Serveur" :** Aucun calcul de solde n'est confié au frontend (Vanilla JS). Toutes les opérations de débit/crédit sont calculées par le serveur et protégées par des contraintes SQL : une transaction est annulée si elle entraîne un **solde négatif (anomalie de solde)**.
+* **Plafonds et "Velocity Checks" :** * **Plafond absolu :** Blocage de tout transfert supérieur à 10 000 EPIC par jour pour limiter l'impact d'une compromission de compte.
+    * **Contrôle de fréquence :** Détection de trop nombreuses transactions en un temps réduit pour contrer les scripts automatisés.
+* **Surveillance des schémas suspects :**
+    * **Transferts en boucle :** Blocage des cycles A→B→A en moins d'une heure pour éviter le brassage de monnaie.
+    * **Fragmentation (Structuring) :** Surveillance de l'accumulation de nombreux petits transferts vers un même destinataire (technique classique pour contourner les seuils de vigilance).
+    * **Auto-transfert :** Interdiction stricte d'envoyer des fonds à son propre compte (émetteur = destinataire).
+    * **Transactions rondes anormales :** Alerte sur les montants "trop parfaits" qui peuvent indiquer des tests de fraude ou des échanges suspects.
 
 ## 2.3 Chiffrement et Protection des Données Sensibles
 * **Zéro stockage bancaire :** En déléguant le paiement à Stripe, nous appliquons le principe de précaution maximale : **aucune donnée de carte bancaire** ne transite ni n'est stockée sur nos serveurs.
