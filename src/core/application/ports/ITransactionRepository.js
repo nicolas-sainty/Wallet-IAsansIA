@@ -4,6 +4,7 @@
 class ITransactionRepository {
     async findById(transactionId) { throw new Error('Method not implemented'); }
     async findByWalletId(walletId, options) { throw new Error('Method not implemented'); }
+    async findBySourceWalletIdSince(walletId, since) { throw new Error('Method not implemented'); }
     async save(transaction) { throw new Error('Method not implemented'); }
     async create(transactionData) { throw new Error('Method not implemented'); }
 

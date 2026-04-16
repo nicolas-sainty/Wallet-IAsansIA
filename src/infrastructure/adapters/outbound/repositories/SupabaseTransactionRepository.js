@@ -19,6 +19,25 @@ class SupabaseTransactionRepository {
         return new Transaction(data);
     }
 
+    /**
+     * Retourne les transactions sortantes depuis un wallet source après une date donnée.
+     * Retourne les données brutes (pas d'entité domaine) pour les calculs d'analyse.
+     * @param {string} walletId
+     * @param {string} since - ISO date string
+     * @returns {Promise<object[]>}
+     */
+    async findBySourceWalletIdSince(walletId, since) {
+        const { data, error } = await this.supabase
+            .from('transactions')
+            .select('transaction_id, amount, source_wallet_id, destination_wallet_id, created_at, status')
+            .eq('source_wallet_id', walletId)
+            .gte('created_at', since)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+    }
+
     async findByWalletId(walletId, options = {}) {
         const { limit = 50, offset = 0 } = options;
         const { data, error } = await this.supabase

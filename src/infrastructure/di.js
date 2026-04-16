@@ -14,6 +14,7 @@ const SupabaseTransactionRepository = require('./adapters/outbound/repositories/
 const SupabaseUserRepository = require('./adapters/outbound/repositories/SupabaseUserRepository');
 const SupabaseGroupRepository = require('./adapters/outbound/repositories/SupabaseGroupRepository');
 const SupabaseEventRepository = require('./adapters/outbound/repositories/SupabaseEventRepository');
+const SupabaseFraudAlertRepository = require('./adapters/outbound/repositories/SupabaseFraudAlertRepository');
 
 // External Services Adapters
 const BCryptHashProvider = require('./adapters/outbound/external-services/BCryptHashProvider');
@@ -22,6 +23,7 @@ const StripePaymentProcessor = require('./adapters/outbound/external-services/St
 
 // Use Cases
 const InitiateTransaction = require('../core/application/use-cases/InitiateTransaction');
+const AnalyzeTransactionForFraud = require('../core/application/use-cases/AnalyzeTransactionForFraud');
 const ProcessTransaction = require('../core/application/use-cases/ProcessTransaction');
 const TransferCredits = require('../core/application/use-cases/TransferCredits');
 const GetWalletBalance = require('../core/application/use-cases/GetWalletBalance');
@@ -78,8 +80,26 @@ function bootstrap() {
     const groupRepo = new SupabaseGroupRepository(supabase);
     const eventRepo = new SupabaseEventRepository(supabase);
 
+    const fraudAlertRepo = new SupabaseFraudAlertRepository(supabase);
+
     // 3. Instancier les Use Cases (Application)
-    const initiateTransactionUC = new InitiateTransaction(walletRepo, transactionRepo, logger);
+    // 3a. Anti-fraude (doit être instancié avant InitiateTransaction qui en dépend)
+    const fraudThresholds = {
+        MAX_SINGLE_AMOUNT:      parseFloat(process.env.FRAUD_MAX_SINGLE_AMOUNT  || '5000'),
+        DAILY_LIMIT:            parseFloat(process.env.FRAUD_DAILY_LIMIT        || '15000'),
+        VELOCITY_MAX_COUNT:     parseInt(process.env.FRAUD_VELOCITY_MAX_COUNT  || '5', 10),
+        VELOCITY_WINDOW_MS:     parseInt(process.env.FRAUD_VELOCITY_WINDOW_MS  || String(10 * 60 * 1000), 10),
+        STRUCTURING_MIN_COUNT:  parseInt(process.env.FRAUD_STRUCTURING_MIN     || '4', 10),
+        STRUCTURING_SMALL_AMOUNT: parseFloat(process.env.FRAUD_STRUCTURING_AMOUNT || '500'),
+        CIRCULAR_WINDOW_MS:     parseInt(process.env.FRAUD_CIRCULAR_WINDOW_MS  || String(60 * 60 * 1000), 10),
+        DORMANT_DAYS:           parseInt(process.env.FRAUD_DORMANT_DAYS        || '90', 10),
+        ROUND_AMOUNT_MIN_COUNT: parseInt(process.env.FRAUD_ROUND_MIN_COUNT     || '5', 10),
+    };
+    const analyzeTransactionForFraudUC = new AnalyzeTransactionForFraud(
+        walletRepo, transactionRepo, fraudAlertRepo, logger, fraudThresholds
+    );
+
+    const initiateTransactionUC = new InitiateTransaction(walletRepo, transactionRepo, logger, analyzeTransactionForFraudUC);
     const processTransactionUC = new ProcessTransaction(walletRepo, transactionRepo, logger);
     const transferCreditsUC = new TransferCredits(walletRepo, transactionRepo, initiateTransactionUC, processTransactionUC, logger);
     const getWalletBalanceUC = new GetWalletBalance(walletRepo);
