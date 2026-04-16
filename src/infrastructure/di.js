@@ -15,6 +15,8 @@ const SupabaseUserRepository = require('./adapters/outbound/repositories/Supabas
 const SupabaseGroupRepository = require('./adapters/outbound/repositories/SupabaseGroupRepository');
 const SupabaseEventRepository = require('./adapters/outbound/repositories/SupabaseEventRepository');
 const SupabaseFraudAlertRepository = require('./adapters/outbound/repositories/SupabaseFraudAlertRepository');
+const SupabaseIntercampusRepository = require('./adapters/outbound/repositories/SupabaseIntercampusRepository');
+const NativeIntercampusHttpClient = require('./adapters/outbound/http/NativeIntercampusHttpClient');
 
 // External Services Adapters
 const BCryptHashProvider = require('./adapters/outbound/external-services/BCryptHashProvider');
@@ -26,6 +28,8 @@ const InitiateTransaction = require('../core/application/use-cases/InitiateTrans
 const AnalyzeTransactionForFraud = require('../core/application/use-cases/AnalyzeTransactionForFraud');
 const ProcessTransaction = require('../core/application/use-cases/ProcessTransaction');
 const TransferCredits = require('../core/application/use-cases/TransferCredits');
+const SendIntercampus = require('../core/application/use-cases/SendIntercampus');
+const ReceiveIntercampus = require('../core/application/use-cases/ReceiveIntercampus');
 const GetWalletBalance = require('../core/application/use-cases/GetWalletBalance');
 const GetWallets = require('../core/application/use-cases/GetWallets');
 const GetWalletTransactions = require('../core/application/use-cases/GetWalletTransactions');
@@ -55,6 +59,7 @@ const AuthController = require('./adapters/inbound/http/controllers/AuthControll
 const GroupController = require('./adapters/inbound/http/controllers/GroupController');
 const EventController = require('./adapters/inbound/http/controllers/EventController');
 const PaymentController = require('./adapters/inbound/http/controllers/PaymentController');
+const IntercampusController = require('./adapters/inbound/http/controllers/IntercampusController');
 
 // Routes Creators
 const createTransactionRoutes = require('./adapters/inbound/http/routes/transaction.routes');
@@ -63,6 +68,7 @@ const createAuthRoutes = require('./adapters/inbound/http/routes/auth.routes');
 const createGroupRoutes = require('./adapters/inbound/http/routes/group.routes');
 const createEventRoutes = require('./adapters/inbound/http/routes/event.routes');
 const createPaymentRoutes = require('./adapters/inbound/http/routes/payment.routes');
+const createIntercampusRoutes = require('./adapters/inbound/http/routes/intercampus.routes');
 
 /**
  * Bootstrap the application dependencies (Manual Dependency Injection)
@@ -81,6 +87,13 @@ function bootstrap() {
     const eventRepo = new SupabaseEventRepository(supabase);
 
     const fraudAlertRepo = new SupabaseFraudAlertRepository(supabase);
+    const intercampusRepo = new SupabaseIntercampusRepository(supabase);
+
+    // Client HTTP inter-campus (natif Node, aucune dépendance externe)
+    const intercampusHttpClient = new NativeIntercampusHttpClient(
+        { timeoutMs: parseInt(process.env.INTERCAMPUS_TIMEOUT_MS || '10000', 10) },
+        logger
+    );
 
     // 3. Instancier les Use Cases (Application)
     // 3a. Anti-fraude (doit être instancié avant InitiateTransaction qui en dépend)
@@ -139,6 +152,17 @@ function bootstrap() {
     const getPaymentRequestsUC = new GetPaymentRequests(transactionRepo);
     const respondToPaymentRequestUC = new RespondToPaymentRequest(transactionRepo, walletRepo, processTransactionUC, logger);
 
+    // Use cases inter-campus
+    const localCampusId = process.env.CAMPUS_ID || 'groupe_2_BDX';
+    const sendIntercampusUC = new SendIntercampus(
+        walletRepo, transactionRepo, intercampusHttpClient, intercampusRepo,
+        analyzeTransactionForFraudUC, logger, localCampusId
+    );
+    const receiveIntercampusUC = new ReceiveIntercampus(
+        walletRepo, transactionRepo, intercampusRepo, intercampusRepo,
+        analyzeTransactionForFraudUC, logger
+    );
+
     // 4. Instancier les contrôleurs (Adapteurs d'entrée)
     const transactionController = new TransactionController(initiateTransactionUC, processTransactionUC, transferCreditsUC);
     const walletController = new WalletController(getWalletBalanceUC, getWalletsUC, getWalletTransactionsUC);
@@ -146,6 +170,7 @@ function bootstrap() {
     const groupController = new GroupController(createGroupUC, getGroupsUC, getGroupUC);
     const eventController = new EventController(getEventsUC, participateInEventUC, getParticipantsUC, getPendingParticipationsUC, validateParticipationUC, createEventUC);
     const paymentController = new PaymentController(createCheckoutSessionUC, getPaymentRequestsUC, respondToPaymentRequestUC);
+    const intercampusController = new IntercampusController(sendIntercampusUC, receiveIntercampusUC);
 
     // 5. Créer les routes express
     const transactionRoutesHex = createTransactionRoutes(transactionController);
@@ -154,6 +179,7 @@ function bootstrap() {
     const groupRoutesHex = createGroupRoutes(groupController);
     const eventRoutesHex = createEventRoutes(eventController);
     const paymentRoutesHex = createPaymentRoutes(paymentController);
+    const intercampusRoutesHex = createIntercampusRoutes(intercampusController);
 
     return {
         transactionRoutesHex,
@@ -161,7 +187,8 @@ function bootstrap() {
         authRoutesHex,
         groupRoutesHex,
         eventRoutesHex,
-        paymentRoutesHex
+        paymentRoutesHex,
+        intercampusRoutesHex,
     };
 }
 

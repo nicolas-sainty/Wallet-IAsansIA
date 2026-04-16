@@ -13,6 +13,7 @@ const eventsRoutes = require('../routes/events.routes');
 const authRoutes = require('../routes/auth.routes');
 const paymentRoutes = require('../routes/payment.routes');
 const webhookRoutes = require('../routes/webhooks.routes');
+const intercampusRoutes = require('../routes/intercampus.routes');
 
 const app = express();
 const PORT = process.env.API_PORT || process.env.PORT || 3000;
@@ -116,6 +117,12 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
+
+// ─── Routes inter-campus (montées à la racine, standard EpiPay) ───────────
+// POST /intercampus-send    — Envoyer des EpiCoins à un campus partenaire
+// POST /intercampus-receive — Recevoir des EpiCoins d'un campus partenaire
+app.use('/', intercampusRoutes);
+
 
 // Static files (frontend)
 app.use(express.static('public'));
